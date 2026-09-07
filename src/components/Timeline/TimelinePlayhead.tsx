@@ -4,6 +4,7 @@ interface TimelinePlayheadProps {
   frame: number;
   zoom: number;
   maxFrame: number;
+  scrollX?: number;
   onChange: (frame: number) => void;
 }
 
@@ -11,6 +12,7 @@ export function TimelinePlayhead({
   frame,
   zoom,
   maxFrame,
+  scrollX = 0,
   onChange,
 }: TimelinePlayheadProps) {
   const dragging = useRef(false);
@@ -18,17 +20,25 @@ export function TimelinePlayhead({
   const handleMouseDown = useCallback(
     (e: React.MouseEvent) => {
       e.preventDefault();
+      e.stopPropagation();
       dragging.current = true;
+
+      const tracksArea = (
+        e.currentTarget.parentElement ?? e.currentTarget
+      ).getBoundingClientRect();
+      const scrollElement =
+        e.currentTarget.parentElement?.querySelector(".tracks-scroll");
 
       const onMove = (ev: MouseEvent) => {
         if (!dragging.current) return;
-        // 簡易実装: 親のtracksエリアからの相対位置で計算する想定
-        // 本格実装時は tracksRef を渡して正確に計算する
-        const x = ev.clientX;
-        // ここでは仮の計算。実際は tracks の getBoundingClientRect を使う
+        const scrollLeft =
+          scrollElement instanceof HTMLElement ? scrollElement.scrollLeft : 0;
         const newFrame = Math.max(
           0,
-          Math.min(maxFrame, Math.round(x / zoom))
+          Math.min(
+            maxFrame,
+            Math.round((ev.clientX - tracksArea.left + scrollLeft) / zoom),
+          ),
         );
         onChange(newFrame);
       };
@@ -42,13 +52,13 @@ export function TimelinePlayhead({
       window.addEventListener("mousemove", onMove);
       window.addEventListener("mouseup", onUp);
     },
-    [zoom, maxFrame, onChange]
+    [zoom, maxFrame, onChange],
   );
 
   return (
     <div
       className="playhead"
-      style={{ left: frame * zoom }}
+      style={{ left: frame * zoom - scrollX }}
       onMouseDown={handleMouseDown}
     >
       <div className="playhead-head" />
