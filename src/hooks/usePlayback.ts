@@ -1,23 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useProjectStore } from "@/stores/projectStore";
 import { useFps, useCompositionDuration } from "@/stores/projectSelectors";
-import { useAudioSync } from "./useAudioSync";
-
-const LOOP_STORAGE_KEY = "yokozuna.playback.loop";
-
-function readStoredLoop(): boolean {
-  try {
-    const v = localStorage.getItem(LOOP_STORAGE_KEY);
-    if (v === null) return true;
-    return v === "1" || v === "true";
-  } catch {
-    return true;
-  }
-}
 
 export const usePlayback = () => {
   const [isPlaying, setIsPlaying] = useState(false);
-  const [isLooping, setIsLoopingState] = useState(readStoredLoop);
+  const [isLooping, setIsLooping] = useState(true);
 
   const fps = useFps();
   const maxFrames = useCompositionDuration();
@@ -25,43 +12,9 @@ export const usePlayback = () => {
   const requestRef = useRef<number | null>(null);
   const lastTimeRef = useRef<number | null>(null);
 
-  const setIsLooping = useCallback((value: boolean | ((prev: boolean) => boolean)) => {
-    setIsLoopingState((prev) => {
-      const next = typeof value === "function" ? value(prev) : value;
-      try {
-        localStorage.setItem(LOOP_STORAGE_KEY, next ? "1" : "0");
-      } catch {
-        /* ignore */
-      }
-      return next;
-    });
-  }, []);
-
-  const play = useCallback(() => {
-    const state = useProjectStore.getState();
-    const duration = Math.max(1, maxFrames);
-    // At last frame with loop: wrap to start so PLAY does not immediately stop
-    if (isLooping && state.currentFrame >= duration - 1) {
-      state.setCurrentFrame(0);
-    }
-    setIsPlaying(true);
-  }, [isLooping, maxFrames]);
+  const play = useCallback(() => setIsPlaying(true), []);
   const pause = useCallback(() => setIsPlaying(false), []);
-  const togglePlay = useCallback(() => {
-    setIsPlaying((prev) => {
-      if (prev) return false;
-      const state = useProjectStore.getState();
-      const duration = Math.max(1, maxFrames);
-      if (isLooping && state.currentFrame >= duration - 1) {
-        state.setCurrentFrame(0);
-      }
-      return true;
-    });
-  }, [isLooping, maxFrames]);
-  const toggleLoop = useCallback(() => setIsLooping((prev) => !prev), [setIsLooping]);
-
-  // Sync timeline audio clips while playing
-  useAudioSync(isPlaying);
+  const togglePlay = useCallback(() => setIsPlaying((prev) => !prev), []);
 
   useEffect(() => {
     if (!isPlaying) {
@@ -73,7 +26,6 @@ export const usePlayback = () => {
       return;
     }
 
-    const duration = Math.max(1, maxFrames);
     const frameInterval = 1000 / Math.max(1, fps);
 
     const animate = (time: number) => {
@@ -90,11 +42,11 @@ export const usePlayback = () => {
         const storeState = useProjectStore.getState();
         let nextFrame = storeState.currentFrame + framesToAdvance;
 
-        if (nextFrame >= duration) {
+        if (nextFrame >= maxFrames) {
           if (isLooping) {
-            nextFrame = nextFrame % duration;
+            nextFrame = 0;
           } else {
-            nextFrame = duration - 1;
+            nextFrame = Math.max(0, maxFrames - 1);
             setIsPlaying(false);
             storeState.setCurrentFrame(nextFrame);
             return;
@@ -123,6 +75,5 @@ export const usePlayback = () => {
     pause,
     togglePlay,
     setIsLooping,
-    toggleLoop,
   };
 };
