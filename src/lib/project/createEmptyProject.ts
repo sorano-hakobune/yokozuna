@@ -1,10 +1,9 @@
 import type { Project, Composition, Layer, Keyframe } from "@/types/project";
-import { generateId } from "./generateId";
 
-export function createEmptyProject(name = "Untitled Project"): Project {
-  const now = new Date().toISOString();
-  const mainCompId = generateId("comp");
-  const firstLayerId = generateId("layer");
+export function createEmptyProject(name = "無題のプロジェクト"): Project {
+  const now = "2026-09-01T00:00:00.000Z";
+  const mainCompId = "comp_main";
+  const firstLayerId = "layer_1";
 
   const initialKeyframe: Keyframe = {
     frame: 0,
@@ -14,7 +13,7 @@ export function createEmptyProject(name = "Untitled Project"): Project {
 
   const initialLayer: Layer = {
     id: firstLayerId,
-    name: "Layer 1",
+    name: "レイヤー 1",
     type: "normal",
     visible: true,
     locked: false,
@@ -23,9 +22,10 @@ export function createEmptyProject(name = "Untitled Project"): Project {
 
   const mainComposition: Composition = {
     id: mainCompId,
-    name: "Main Timeline",
-    duration: 240,
+    name: "シーン 1",
+    duration: 120,
     layers: [initialLayer],
+    sounds: [],
   };
 
   return {
@@ -37,11 +37,17 @@ export function createEmptyProject(name = "Untitled Project"): Project {
       author: "",
     },
     settings: {
-      width: 1920,
-      height: 1080,
+      width: 550,
+      height: 400,
       fps: 24,
       backgroundColor: "#ffffff",
-      duration: 240,
+      duration: 120,
+      gridSize: 20,
+      showGrid: false,
+      snapToGrid: false,
+      showGuides: true,
+      snapToGuides: true,
+      guides: [],
     },
     assets: {},
     symbols: {},

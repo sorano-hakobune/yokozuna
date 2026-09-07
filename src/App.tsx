@@ -1,96 +1,51 @@
-import React, { useEffect } from "react";
-import { Toolbar } from "./components/Toolbar";
-import { Timeline } from "./components/Timeline";
-import { Stage } from "./components/Stage";
-import { Inspector } from "./components/Inspector";
-import { PlaybackControls } from "./components/Playback";
-import { useProjectStore } from "./stores/projectStore";
-import "./components/Timeline/timeline.css";
+import { useState } from "react";
+import reactLogo from "./assets/react.svg";
+import { invoke } from "@tauri-apps/api/core";
+import "./App.css";
 
-export const App: React.FC = () => {
-  const setSelectedTool = useProjectStore((s) => s.setSelectedTool);
-  const selectedLayerId = useProjectStore((s) => s.selectedLayerId);
-  const selectedElementId = useProjectStore((s) => s.selectedElementId);
-  const currentFrame = useProjectStore((s) => s.currentFrame);
-  const copyElement = useProjectStore((s) => s.copyElement);
-  const pasteElement = useProjectStore((s) => s.pasteElement);
-  const removeElement = useProjectStore((s) => s.removeElement);
+function App() {
+  const [greetMsg, setGreetMsg] = useState("");
+  const [name, setName] = useState("");
 
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement;
-      if (
-        target.tagName === "INPUT" ||
-        target.tagName === "TEXTAREA" ||
-        target.isContentEditable
-      ) {
-        return;
-      }
-
-      if ((e.ctrlKey || e.metaKey) && e.key === "c") {
-        if (selectedLayerId && selectedElementId) {
-          copyElement(selectedLayerId, currentFrame, selectedElementId);
-          e.preventDefault();
-        }
-      }
-
-      if ((e.ctrlKey || e.metaKey) && e.key === "v") {
-        if (selectedLayerId) {
-          pasteElement(selectedLayerId, currentFrame);
-          e.preventDefault();
-        }
-      }
-
-      if (
-        (e.key === "Delete" || e.key === "Backspace") &&
-        selectedElementId &&
-        selectedLayerId
-      ) {
-        removeElement(selectedLayerId, currentFrame, selectedElementId);
-        e.preventDefault();
-      }
-
-      if (!e.ctrlKey && !e.metaKey) {
-        if (e.key === "v") setSelectedTool("select");
-        if (e.key === "r") setSelectedTool("rectangle");
-        if (e.key === "c") setSelectedTool("circle");
-        if (e.key === "l") setSelectedTool("line");
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [
-    selectedLayerId,
-    selectedElementId,
-    currentFrame,
-    copyElement,
-    pasteElement,
-    removeElement,
-    setSelectedTool,
-  ]);
+  async function greet() {
+    // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
+    setGreetMsg(await invoke("greet", { name }));
+  }
 
   return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        height: "100vh",
-        width: "100vw",
-        backgroundColor: "#18181b",
-      }}
-    >
-      <Toolbar />
+    <main className="container">
+      <h1>Welcome to Tauri + React</h1>
 
-      <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
-        <Stage />
-        <Inspector />
+      <div className="row">
+        <a href="https://vite.dev" target="_blank">
+          <img src="/vite.svg" className="logo vite" alt="Vite logo" />
+        </a>
+        <a href="https://tauri.app" target="_blank">
+          <img src="/tauri.svg" className="logo tauri" alt="Tauri logo" />
+        </a>
+        <a href="https://react.dev" target="_blank">
+          <img src={reactLogo} className="logo react" alt="React logo" />
+        </a>
       </div>
+      <p>Click on the Tauri, Vite, and React logos to learn more.</p>
 
-      <PlaybackControls />
-      <Timeline />
-    </div>
+      <form
+        className="row"
+        onSubmit={(e) => {
+          e.preventDefault();
+          greet();
+        }}
+      >
+        <input
+          id="greet-input"
+          onChange={(e) => setName(e.currentTarget.value)}
+          placeholder="Enter a name..."
+        />
+        <button type="submit">Greet</button>
+      </form>
+      <p>{greetMsg}</p>
+    </main>
   );
-};
+}
 
 export default App;
