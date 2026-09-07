@@ -18,6 +18,7 @@ Adobe Animate（旧 Flash Professional）のワークフローにインスパイ
 ## 特徴
 
 ### アニメーションコア
+
 - **キーフレーム方式** — 1つのキーフレームに複数プロパティを保持（Flash スタイル）
 - **モーション トゥイーン** — イージング付きの位置・スケール・回転・透明度補間
 - **シェイプ トゥイーン** — 輪郭リサンプルによる形状モーフィング
@@ -27,6 +28,7 @@ Adobe Animate（旧 Flash Professional）のワークフローにインスパイ
 - **フレームラベル** — マーカー付きのタイムライン管理
 
 ### 描画・編集
+
 - 矩形 / 円 / 線 / パス / テキスト
 - ベジェ曲線編集（ハンドル操作・スムーズ / 直線化）
 - パス頂点の追加・削除・移動
@@ -37,22 +39,26 @@ Adobe Animate（旧 Flash Professional）のワークフローにインスパイ
 - 整列・分布ツール
 
 ### レイヤー・シンボル
+
 - 通常 / ガイド / マスクレイヤー
 - レイヤーフォルダ（入れ子・折りたたみ）
 - シンボル作成・配置・編集モード（F8 / ダブルクリック）
 - レイヤーのロック / 表示切替 / 並べ替え
 
 ### アセット・音声
+
 - SVG / 画像のインポート（ベクター優先 or ビットマップ）
 - 音声トラック（MP3 / WAV など）のタイムライン配置
 - ライブラリ管理（ソート・グリッド・重複・使用状況）
 
 ### 書き出し
+
 - PNG シーケンス（透明対応） + ZIP パッケージ
 - WebM 動画（音声ミックス対応）
 - プロジェクト保存（`.yoko` / レガシー `.json`）
 
 ### UX
+
 - 日本語 UI（メニュー・インスペクタ・再生コントロール）
 - アンドゥ / リドゥ（スナップショット履歴）
 - オートセーブ + 最近使ったファイル
@@ -61,15 +67,10 @@ Adobe Animate（旧 Flash Professional）のワークフローにインスパイ
 
 ---
 
-## スクリーンショット
-
-> ※ 開発中のため、実際の画面は最新ビルドをご確認ください。
-
----
-
 ## 開発環境のセットアップ
 
 ### 必要要件
+
 - Node.js 20+
 - pnpm（推奨）または npm / yarn
 - Rust（Tauri 2 用）
@@ -79,7 +80,7 @@ Adobe Animate（旧 Flash Professional）のワークフローにインスパイ
 
 ```bash
 # リポジトリをクローン
-git clone https://github.com/your-org/yokozuna.git
+git clone https://github.com/sorano-hakobune/yokozuna.git
 cd yokozuna
 
 # 依存関係をインストール
@@ -145,8 +146,8 @@ interface Project {
 interface Keyframe {
   id: string;
   frame: number;
-  elements: Element[];          // このキーフレーム上のオブジェクト
-  tween?: TweenType;            // motion | shape | none
+  elements: Element[]; // このキーフレーム上のオブジェクト
+  tween?: TweenType; // motion | shape | none
   easing?: EasingType;
   easingBezier?: [number, number, number, number];
   motionPath?: PathPoint[];
@@ -159,19 +160,19 @@ interface Keyframe {
 
 ## ショートカット（一部）
 
-| キー | 動作 |
-|------|------|
-| `Space` / `Enter` | 再生 / 停止 |
-| `Shift + L` | ループ再生切替 |
-| `O` | オニオンスキン |
-| `F5` | フレーム挿入 |
-| `F6` | キーフレーム挿入 |
-| `F8` | シンボルに変換 |
-| `Ctrl + Z` / `Ctrl + Shift + Z` | アンドゥ / リドゥ |
-| `Ctrl + C / X / V` | コピー / カット / ペースト |
-| `G` | グリッド表示切替 |
-| `T` | テキストツール |
-| `K` / `I` | ペイントバケツ / スポイト |
+| キー                            | 動作                       |
+| ------------------------------- | -------------------------- |
+| `Space` / `Enter`               | 再生 / 停止                |
+| `Shift + L`                     | ループ再生切替             |
+| `O`                             | オニオンスキン             |
+| `F5`                            | フレーム挿入               |
+| `F6`                            | キーフレーム挿入           |
+| `F8`                            | シンボルに変換             |
+| `Ctrl + Z` / `Ctrl + Shift + Z` | アンドゥ / リドゥ          |
+| `Ctrl + C / X / V`              | コピー / カット / ペースト |
+| `G`                             | グリッド表示切替           |
+| `T`                             | テキストツール             |
+| `K` / `I`                       | ペイントバケツ / スポイト  |
 
 ---
 
