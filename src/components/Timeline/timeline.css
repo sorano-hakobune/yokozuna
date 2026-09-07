@@ -1,0 +1,174 @@
+/* Timeline basic styles (dark theme) */
+
+.timeline {
+  display: flex;
+  height: 280px;
+  border-top: 1px solid #333;
+  background: #1e1e1e;
+  color: #ccc;
+  font-size: 12px;
+  user-select: none;
+  overflow: hidden;
+}
+
+.timeline.empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #666;
+}
+
+/* Left side: layer list */
+.layer-list {
+  width: 180px;
+  flex-shrink: 0;
+  border-right: 1px solid #333;
+  display: flex;
+  flex-direction: column;
+  background: #252525;
+}
+
+.layer-list-header {
+  height: 28px;
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+  border-bottom: 1px solid #333;
+}
+
+.layer-list-header button {
+  background: #3a3a3a;
+  border: 1px solid #555;
+  color: #ddd;
+  padding: 2px 8px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 11px;
+}
+
+.layer-list-header button:hover {
+  background: #4a4a4a;
+}
+
+.layer-header-row {
+  height: 28px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px;
+  border-bottom: 1px solid #2a2a2a;
+}
+
+.layer-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Right side: tracks */
+.tracks-area {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.timeline-ruler {
+  height: 28px;
+  position: relative;
+  border-bottom: 1px solid #333;
+  background: #2a2a2a;
+  flex-shrink: 0;
+}
+
+.ruler-mark {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  border-left: 1px solid #444;
+}
+
+.ruler-label {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  font-size: 10px;
+  color: #888;
+}
+
+.tracks-scroll {
+  flex: 1;
+  position: relative;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.track {
+  height: 28px;
+  position: relative;
+  border-bottom: 1px solid #2a2a2a;
+  cursor: crosshair;
+}
+
+.track.locked {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Keyframe diamond */
+.keyframe {
+  position: absolute;
+  top: 8px;
+  width: 12px;
+  height: 12px;
+  background: #4af;
+  transform: translateX(-50%) rotate(45deg);
+  cursor: pointer;
+  z-index: 2;
+}
+
+.keyframe:hover {
+  background: #6cf;
+}
+
+.keyframe.current {
+  background: #f80;
+}
+
+.keyframe.has-tween {
+  box-shadow: 0 0 0 1px #2a8;
+}
+
+/* Playhead */
+.playhead {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.playhead-head {
+  position: absolute;
+  top: 0;
+  left: -5px;
+  width: 0;
+  height: 0;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-top: 10px solid #e33;
+  pointer-events: auto;
+  cursor: ew-resize;
+}
+
+.playhead-line {
+  position: absolute;
+  top: 10px;
+  left: 0;
+  width: 2px;
+  height: calc(100% - 10px);
+  background: #e33;
+}
