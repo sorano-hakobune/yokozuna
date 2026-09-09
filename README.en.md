@@ -2,13 +2,13 @@
 
 **A lightweight, cross-platform 2D timeline animation editor inspired by Flash / Adobe Animate**
 
-Yokozuna is a modern authoring tool for creating timeline-based 2D animations, comfortable to use both in the browser and as a desktop app.  
+Yokozuna is a modern authoring tool for creating timeline-based 2D animations, comfortable to use both in the browser and on the desktop.  
 It draws inspiration from the workflow of Adobe Animate (formerly Flash Professional), reimagined with a contemporary UI and architecture.
 
 - **Runtime**: Tauri 2 (lightweight, fast, easy to distribute)
 - **Frontend**: React + TypeScript + Vite
 - **Canvas**: SVG-based stage (precise transforms and export)
-- **State**: Zustand
+- **State management**: Zustand
 - **Project format**: `.yoko` (JSON-based)
 
 [日本語](README.md)
@@ -21,15 +21,15 @@ It draws inspiration from the workflow of Adobe Animate (formerly Flash Professi
 
 - **Keyframe model** — Multiple properties per keyframe (Flash-style)
 - **Motion tween** — Position, scale, rotation, and opacity interpolation with easing
-- **Shape tween** — Contour-resample morphing between shapes
+- **Shape tween** — Shape morphing via contour resampling
 - **Custom easing** — 30+ Penner curves + arbitrary cubic Bézier
-- **Motion path** — Follow a path with optional orientation
+- **Motion path** — Movement along a path + automatic orientation tracking
 - **Onion skin** — Ghost frames before and after the playhead
 - **Frame labels** — Named markers on the timeline
 
 ### Drawing & Editing
 
-- Rectangle / ellipse / line / path / text
+- Rectangle / circle / line / path / text
 - Bézier path editing (handles, smooth / straighten)
 - Path vertex insert / delete / move
 - Paint bucket + eyedropper
@@ -180,7 +180,7 @@ See `src/types/project.ts` for full definitions.
 
 - [ ] Bone / skinning
 - [ ] Particles
-- [ ] Script panel (lightweight ActionScript-compatible or JS)
+- [ ] Script panel (a lightweight ActionScript-like language, or JavaScript)
 - [ ] Cloud sync / collaboration
 - [ ] Plugin system
 - [ ] Stronger i18n support
