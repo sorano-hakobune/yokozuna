@@ -109,23 +109,34 @@ pnpm tauri build
 
 ```text
 src/
-├── types/               # Project / Layer / Keyframe / Symbol などの型定義
+├── App.tsx / main.tsx / router.tsx / routes/  # エントリ + TanStack Router
+├── types/               # project.ts (Project / Layer / Keyframe / Symbol 等)
 ├── lib/
-│   ├── project/         # createEmptyProject, generateId, fileIo など
-│   ├── easing.ts        # イージング関数群
-│   ├── transformGeometry.ts
-│   └── ...
+│   ├── project/         # createEmptyProject, generateId, fileIo, persistence など
+│   ├── animation/       # easing.ts, interpolate.ts, motionPath.ts, onionSkin.ts
+│   ├── draw/            # shapeFactory, pathBezier, fillRegion, erasePath など
+│   ├── export/          # renderFrameCanvas, exportVideo, exportPngSequence など
+│   ├── selection/       # selectionBounds, alignDistribute, groupTransform など
+│   ├── stage/           # snap.ts, hitTest.ts
+│   ├── layers/          # layerGroups, layerFolders
+│   ├── filters/         # elementFilters, SvgFilterDefs
+│   └── color.ts / id.ts / file-utils.ts / systemFonts.ts / preview-* など
 ├── stores/
-│   └── projectStore.ts  # Zustand メインストア + セレクター
+│   ├── projectStore.ts / projectSelectors.ts
+│   └── slices/          # element / layer / keyframe / asset / ui / history など
 ├── components/
-│   ├── Editor/          # メインエディタシェル
-│   ├── Stage/           # キャンバス・変形ハンドル・描画ツール
-│   ├── Timeline/        # タイムライン UI
-│   ├── Inspector/       # 右ドック（カラー / ライブラリ / プロパティ）
-│   ├── MenuBar/
-│   ├── ToolsPanel/
-│   └── Playback/
-└── hooks/               # 再生同期・オートセーブなど
+│   ├── Editor/          # メインエディタシェル + parts/
+│   ├── Stage/           # Stage.tsx, TransformControls, 描画ツール + transformGeometry.ts
+│   ├── Timeline/        # Timeline UI
+│   ├── Inspector/       # 右ドック（プロパティ編集） + parts/ hooks/
+│   ├── Panels/          # ColorPanel / LibraryPanel
+│   ├── MenuBar/         # メニュー + menus/
+│   ├── ToolsPanel/      # ToolsPanel.tsx
+│   ├── Playback/        # PlaybackControls.tsx
+│   └── ui/              # Dialog / ContextMenu / ExportDialogs など共通UI
+├── hooks/               # usePlayback, useAutosave, useAudioSync など
+├── styles/ / styles.css # editor.css など
+└── assets/              # favicon.svg など
 ```
 
 ---
