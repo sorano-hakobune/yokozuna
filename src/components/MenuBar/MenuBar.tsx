@@ -253,6 +253,12 @@ export function MenuBar() {
   const animationItems = buildAnimationItems({
     currentFrame,
     selectedLayerId,
+    canTweenAtCurrentFrame: (() => {
+      const layer = layersForMenu.find((l) => l.id === selectedLayerId);
+      if (!layer) return false;
+      const base = layer.keyframes.find((k) => k.frame === currentFrame);
+      return !!base && layer.keyframes.some((k) => k.frame > base.frame);
+    })(),
     frameLabels,
     addFrameLabel,
     removeFrameLabel,

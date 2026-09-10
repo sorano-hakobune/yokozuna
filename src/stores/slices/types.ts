@@ -76,6 +76,8 @@ export interface ClipboardSlice {
   clipboard: Element[] | null;
   /** Timeline keyframe copy buffer (elements + tween meta). */
   keyframeClipboard: {
+    /** Source layer: paste keeps element ids only within the same layer. */
+    layerId: string;
     elements: Element[];
     tween: TweenType;
     easing?: EasingType;

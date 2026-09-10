@@ -226,6 +226,7 @@ export function getProjectSelectionState(project: Project) {
     selectedElementIds: [] as string[],
     clipboard: null as Element[] | null,
     keyframeClipboard: null as {
+      layerId: string;
       elements: Element[];
       tween: TweenType;
       easing?: EasingType;
@@ -236,6 +237,46 @@ export function getProjectSelectionState(project: Project) {
   };
 }
 
+/**
+ * Tween settings for a brand-new keyframe inserted at `frame`.
+ *
+ * - Case A (normal creation): no tween span surrounds `frame`
+ *   → `{ tween: "none" }` (legacy default, unchanged).
+ * - Case B (mid-span edit): `frame` falls strictly inside an existing tween
+ *   span (`prev.tween !== "none"` with keyframes on both sides)
+ *   → inherit the span's tween / easing / custom-bezier so the split halves
+ *   (`prev → frame` and `frame → next`) keep interpolating.
+ *
+ * Motion path is intentionally NOT inherited: it stores absolute span-wide
+ * coordinates, so replaying it on the back half would be wrong. The back
+ * half falls back to straight interpolation with the inherited easing.
+ */
+export function tweenForInsertedKeyframe(
+  keyframes: Keyframe[],
+  frame: number,
+): Pick<Keyframe, "tween" | "easing" | "easingBezier"> {
+  let prev: Keyframe | undefined;
+  let next: Keyframe | undefined;
+  for (const kf of keyframes) {
+    if (kf.frame < frame && (!prev || kf.frame > prev.frame)) prev = kf;
+    if (kf.frame > frame && (!next || kf.frame < next.frame)) next = kf;
+  }
+  if (prev && next && prev.tween !== "none") {
+    return {
+      tween: prev.tween,
+      ...(prev.easing ? { easing: prev.easing } : {}),
+      ...(prev.easingBezier
+        ? {
+            easingBezier: [
+              ...prev.easingBezier,
+            ] as Keyframe["easingBezier"],
+          }
+        : {}),
+    };
+  }
+  return { tween: "none" };
+}
+
 export function replaceLayerKeyframe(
   layer: Layer,
   frame: number,
@@ -243,12 +284,22 @@ export function replaceLayerKeyframe(
 ): Layer {
   const existing = layer.keyframes.find((item) => item.frame === frame);
   // Preserve tween / easing / custom-bezier / motion path when only elements
-  // change (e.g. transform edit). Brand-new keyframes default to tween: "none".
+  // change (e.g. transform edit). Brand-new keyframes default to tween: "none",
+  // except when inserted inside an existing tween span (Case B above).
+  const inherited = existing ? null : tweenForInsertedKeyframe(layer.keyframes, frame);
   const keyframe: Keyframe = {
     frame,
-    tween: existing?.tween ?? "none",
-    ...(existing?.easing ? { easing: existing.easing } : {}),
-    ...(existing?.easingBezier ? { easingBezier: [...existing.easingBezier] as Keyframe["easingBezier"] } : {}),
+    tween: existing?.tween ?? inherited?.tween ?? "none",
+    ...(existing?.easing
+      ? { easing: existing.easing }
+      : inherited?.easing
+        ? { easing: inherited.easing }
+        : {}),
+    ...(existing?.easingBezier
+      ? { easingBezier: [...existing.easingBezier] as Keyframe["easingBezier"] }
+      : inherited?.easingBezier
+        ? { easingBezier: [...inherited.easingBezier] as Keyframe["easingBezier"] }
+        : {}),
     ...(existing?.motionPath
       ? {
           motionPath: {

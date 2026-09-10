@@ -16,6 +16,7 @@ import {
   projectWithLayers,
   shiftFrameLabels,
   shiftLayerFrames,
+  tweenForInsertedKeyframe,
 } from "./shared";
 import { generateId } from "@/lib/project";
 
@@ -44,13 +45,15 @@ export const createKeyframeSlice: StateCreator<
                   }
                   // Flash-style: blank insert copies previous keyframe content
                   // so the same element ids can be tweened across the span.
+                  // Inside an existing tween span the new keyframe inherits
+                  // the span's tween settings so both halves keep tweening.
                   const resolvedElements =
                     elements !== undefined
                       ? cloneElements(elements)
                       : getPreviousKeyframeElements(layer.keyframes, frame);
                   const newKeyframe: Keyframe = {
                     frame,
-                    tween: "none",
+                    ...tweenForInsertedKeyframe(layer.keyframes, frame),
                     elements: resolvedElements,
                   };
                   return {
@@ -208,6 +211,7 @@ export const createKeyframeSlice: StateCreator<
       if (!kf) return;
       set({
         keyframeClipboard: {
+          layerId,
           elements: cloneElements(kf.elements),
           tween: kf.tween,
           ...(kf.easing ? { easing: kf.easing } : {}),
@@ -236,9 +240,14 @@ export const createKeyframeSlice: StateCreator<
         const layer = target.layers.find((l) => l.id === layerId);
         if (!layer || layer.locked) return state;
 
+        // Same-layer paste keeps element ids so the pasted keyframe stays
+        // tween-compatible with its neighbors (like copyKeyframe). Pasting
+        // into a different layer regenerates ids to avoid cross-layer
+        // id collisions.
+        const keepIds = clip.layerId === layerId;
         const elements = clip.elements.map((el) => ({
           ...JSON.parse(JSON.stringify(el)),
-          id: generateId(el.type === "shape" ? "shape" : el.type),
+          ...(keepIds ? {} : { id: generateId(el.type === "shape" ? "shape" : el.type) }),
         })) as Element[];
 
         const existing = layer.keyframes.find((k) => k.frame === frame);

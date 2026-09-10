@@ -3,6 +3,9 @@ import type { MenuItemEntry } from "../menuTypes";
 export type AnimationMenuDeps = {
   currentFrame: number;
   selectedLayerId: string | undefined;
+  /** True when currentFrame sits on a keyframe that has a later keyframe
+   *  (i.e. a tween created here would actually span something). */
+  canTweenAtCurrentFrame: boolean;
   frameLabels: { id: string; frame: number }[];
   addFrameLabel: (frame: number, name: string) => void;
   removeFrameLabel: (id: string) => void;
@@ -53,14 +56,14 @@ export function buildAnimationItems(d: AnimationMenuDeps): MenuItemEntry[] {
     "sep",
     {
       label: "トゥイーンを追加（モーション）",
-      disabled: !d.selectedLayerId,
+      disabled: !d.selectedLayerId || !d.canTweenAtCurrentFrame,
       onClick: () => {
         if (d.selectedLayerId) d.setKeyframeTween(d.selectedLayerId, d.currentFrame, "motion", "linear");
       },
     },
     {
       label: "トゥイーンを追加（シェイプ）",
-      disabled: !d.selectedLayerId,
+      disabled: !d.selectedLayerId || !d.canTweenAtCurrentFrame,
       onClick: () => {
         if (d.selectedLayerId) d.setKeyframeTween(d.selectedLayerId, d.currentFrame, "shape", "linear");
       },
