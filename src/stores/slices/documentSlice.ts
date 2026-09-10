@@ -152,7 +152,7 @@ export const createDocumentSlice: StateCreator<
       });
     },
 
-    addComposition: (name = "譁ｰ隕上す繝ｼ繝ｳ") => {
+    addComposition: (name = "新規シーン") => {
       const id = generateId("comp");
       const layerId = generateId("layer");
       const newComp: Composition = {
@@ -162,7 +162,7 @@ export const createDocumentSlice: StateCreator<
         layers: [
           {
             id: layerId,
-            name: "繝ｬ繧､繝､繝ｼ 1",
+            name: "レイヤー 1",
             type: "normal",
             visible: true,
             locked: false,

@@ -14,15 +14,20 @@ export function estimateElementBounds(
 ): { minX: number; minY: number; maxX: number; maxY: number } {
   const sx = Math.abs(element.scaleX || 1);
   const sy = Math.abs(element.scaleY || 1);
+  // Pivot model: world ≈ T + S*(L - P) (rotation ignored, rough estimate)
+  const pivX = element.pivot?.x ?? 0;
+  const pivY = element.pivot?.y ?? 0;
+  const cx = element.x - pivX * sx;
+  const cy = element.y - pivY * sy;
 
   if (element.type === "bitmap") {
     const w = (assetSize?.width ?? 100) * sx;
     const h = (assetSize?.height ?? 100) * sy;
     return {
-      minX: element.x - w / 2,
-      minY: element.y - h / 2,
-      maxX: element.x + w / 2,
-      maxY: element.y + h / 2,
+      minX: cx - w / 2,
+      minY: cy - h / 2,
+      maxX: cx + w / 2,
+      maxY: cy + h / 2,
     };
   }
 
@@ -30,10 +35,10 @@ export function estimateElementBounds(
     const w = 100 * sx;
     const h = 100 * sy;
     return {
-      minX: element.x - w / 2,
-      minY: element.y - h / 2,
-      maxX: element.x + w / 2,
-      maxY: element.y + h / 2,
+      minX: cx - w / 2,
+      minY: cy - h / 2,
+      maxX: cx + w / 2,
+      maxY: cy + h / 2,
     };
   }
 
@@ -43,19 +48,19 @@ export function estimateElementBounds(
       const w = (shape.width ?? 100) * sx;
       const h = (shape.height ?? 100) * sy;
       return {
-        minX: shape.x - w / 2,
-        minY: shape.y - h / 2,
-        maxX: shape.x + w / 2,
-        maxY: shape.y + h / 2,
+        minX: cx - w / 2,
+        minY: cy - h / 2,
+        maxX: cx + w / 2,
+        maxY: cy + h / 2,
       };
     }
     case "circle": {
       const r = (shape.radius ?? 50) * Math.max(sx, sy);
       return {
-        minX: shape.x - r,
-        minY: shape.y - r,
-        maxX: shape.x + r,
-        maxY: shape.y + r,
+        minX: cx - r,
+        minY: cy - r,
+        maxX: cx + r,
+        maxY: cy + r,
       };
     }
     case "line":
@@ -63,10 +68,10 @@ export function estimateElementBounds(
       const pts = shape.points ?? [];
       if (pts.length === 0) {
         return {
-          minX: shape.x - 20,
-          minY: shape.y - 20,
-          maxX: shape.x + 20,
-          maxY: shape.y + 20,
+          minX: cx - 20,
+          minY: cy - 20,
+          maxX: cx + 20,
+          maxY: cy + 20,
         };
       }
       let minX = Infinity;
@@ -74,8 +79,8 @@ export function estimateElementBounds(
       let maxX = -Infinity;
       let maxY = -Infinity;
       for (const p of pts) {
-        const wx = shape.x + p.x * sx;
-        const wy = shape.y + p.y * sy;
+        const wx = shape.x + (p.x - pivX) * sx;
+        const wy = shape.y + (p.y - pivY) * sy;
         minX = Math.min(minX, wx);
         minY = Math.min(minY, wy);
         maxX = Math.max(maxX, wx);

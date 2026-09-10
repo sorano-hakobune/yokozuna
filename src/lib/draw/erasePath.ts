@@ -29,9 +29,12 @@ const toLocalPoint = (point: Point, shape: ShapeElement): Point => {
   const angle = ((shape.rotation ?? 0) * Math.PI) / 180;
   const cos = Math.cos(angle);
   const sin = Math.sin(angle);
+  // Inverse of W = T + R*S*(L - P)
+  const pivX = shape.pivot?.x ?? 0;
+  const pivY = shape.pivot?.y ?? 0;
   return {
-    x: (dx * cos + dy * sin) / (shape.scaleX || 1),
-    y: (-dx * sin + dy * cos) / (shape.scaleY || 1),
+    x: (dx * cos + dy * sin) / (shape.scaleX || 1) + pivX,
+    y: (-dx * sin + dy * cos) / (shape.scaleY || 1) + pivY,
   };
 };
 

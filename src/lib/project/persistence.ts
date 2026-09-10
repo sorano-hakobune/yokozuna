@@ -72,14 +72,100 @@ export function setPersistencePrefs(partial: Partial<PersistencePrefs>): void {
   }
 }
 
+const IDB_NAME = "yokozuna-persistence-v1";
+const IDB_STORE = "kv";
+const IDB_AUTOSAVE_KEY = "autosave-draft";
+
+function openPersistenceDb(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(IDB_NAME, 1);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains(IDB_STORE)) {
+        db.createObjectStore(IDB_STORE);
+      }
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error ?? new Error("IDB open failed"));
+  });
+}
+
+function idbGet<T>(key: string): Promise<T | null> {
+  return openPersistenceDb()
+    .then(
+      (db) =>
+        new Promise<T | null>((resolve, reject) => {
+          const tx = db.transaction(IDB_STORE, "readonly");
+          const req = tx.objectStore(IDB_STORE).get(key);
+          req.onsuccess = () => resolve((req.result as T) ?? null);
+          req.onerror = () => reject(req.error);
+        }),
+    )
+    .catch(() => null);
+}
+
+function idbSet(key: string, value: unknown): Promise<void> {
+  return openPersistenceDb().then(
+    (db) =>
+      new Promise<void>((resolve, reject) => {
+        const tx = db.transaction(IDB_STORE, "readwrite");
+        tx.objectStore(IDB_STORE).put(value, key);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+      }),
+  );
+}
+
+function idbDel(key: string): Promise<void> {
+  return openPersistenceDb()
+    .then(
+      (db) =>
+        new Promise<void>((resolve, reject) => {
+          const tx = db.transaction(IDB_STORE, "readwrite");
+          tx.objectStore(IDB_STORE).delete(key);
+          tx.oncomplete = () => resolve();
+          tx.onerror = () => reject(tx.error);
+        }),
+    )
+    .catch(() => undefined);
+}
+
+/** True if any image/audio/svg asset is missing its payload (empty src). */
+export function projectHasMissingAssetData(project: Project): boolean {
+  return Object.values(project.assets ?? {}).some(
+    (a) =>
+      (a.type === "image" || a.type === "svg" || a.type === "audio") &&
+      !(typeof a.src === "string" && a.src.length > 0),
+  );
+}
+
+/**
+ * Sync peek used by status UI. Prefers localStorage full draft;
+ * returns null for IDB-only marker (use loadAutosaveAsync for restore).
+ */
 export function loadAutosave(): AutosavePayload | null {
   try {
-    const data = safeParse<AutosavePayload>(localStorage.getItem(AUTOSAVE_KEY));
-    if (!data?.project || !data.savedAt) return null;
-    return data;
+    const data = safeParse<AutosavePayload & { idb?: boolean }>(
+      localStorage.getItem(AUTOSAVE_KEY),
+    );
+    if (!data?.savedAt) return null;
+    if (data.idb && !data.project) return null;
+    if (!data.project) return null;
+    return { savedAt: data.savedAt, project: data.project };
   } catch {
     return null;
   }
+}
+
+/** Full autosave load including IndexedDB (survives large base64 assets). */
+export async function loadAutosaveAsync(): Promise<AutosavePayload | null> {
+  try {
+    const fromIdb = await idbGet<AutosavePayload>(IDB_AUTOSAVE_KEY);
+    if (fromIdb?.project && fromIdb.savedAt) return fromIdb;
+  } catch {
+    /* fall through */
+  }
+  return loadAutosave();
 }
 
 export function clearAutosave(): void {
@@ -88,49 +174,43 @@ export function clearAutosave(): void {
   } catch {
     /* ignore */
   }
+  void idbDel(IDB_AUTOSAVE_KEY);
 }
 
 /**
- * Write autosave draft. Returns false if skipped (disabled / too large / error).
+ * Write autosave draft with FULL asset payloads.
+ * IndexedDB is primary (large quota). localStorage keeps a copy only when it fits —
+ * we never strip data: URLs to empty strings (that caused post-restart image loss).
  */
 export function writeAutosave(project: Project): boolean {
   if (!getPersistencePrefs().autosaveEnabled) return false;
+  const payload: AutosavePayload = {
+    savedAt: new Date().toISOString(),
+    project,
+  };
+
+  // Primary: IndexedDB (async, fire-and-forget but errors logged)
+  void idbSet(IDB_AUTOSAVE_KEY, payload).catch((err) => {
+    console.warn("[autosave] IndexedDB write failed:", err);
+  });
+
+  // Secondary: localStorage only when the full payload fits — never slim away src
   try {
-    const payload: AutosavePayload = {
-      savedAt: new Date().toISOString(),
-      project,
-    };
     const json = JSON.stringify(payload);
-    if (byteLength(json) > MAX_JSON_BYTES) {
-      // Try without asset payloads (keep structure, drop heavy src)
-      const slim: Project = {
-        ...project,
-        assets: Object.fromEntries(
-          Object.entries(project.assets).map(([id, a]) => [
-            id,
-            {
-              ...a,
-              src:
-                typeof a.src === "string" && a.src.startsWith("data:")
-                  ? ""
-                  : a.src,
-            },
-          ]),
-        ),
-      };
-      const slimPayload: AutosavePayload = {
-        savedAt: payload.savedAt,
-        project: slim,
-      };
-      const slimJson = JSON.stringify(slimPayload);
-      if (byteLength(slimJson) > MAX_JSON_BYTES) return false;
-      localStorage.setItem(AUTOSAVE_KEY, slimJson);
-      return true;
+    if (byteLength(json) <= MAX_JSON_BYTES) {
+      localStorage.setItem(AUTOSAVE_KEY, json);
+    } else {
+      // Marker so UI can show "draft exists"; restore must use loadAutosaveAsync
+      localStorage.setItem(
+        AUTOSAVE_KEY,
+        JSON.stringify({ savedAt: payload.savedAt, idb: true }),
+      );
     }
-    localStorage.setItem(AUTOSAVE_KEY, json);
     return true;
-  } catch {
-    return false;
+  } catch (err) {
+    console.warn("[autosave] localStorage write failed:", err);
+    // IDB may still succeed
+    return true;
   }
 }
 
@@ -166,12 +246,28 @@ export function listRecentProjects(): RecentEntry[] {
 }
 
 export function loadRecentSnapshot(id: string): Project | null {
+  // Sync path: localStorage only (may be empty for large projects).
   const store = readRecentStore();
   return store.snapshots[id] ?? null;
 }
 
+/** Prefer IndexedDB snapshot, then localStorage. */
+export async function loadRecentSnapshotAsync(
+  id: string,
+): Promise<Project | null> {
+  try {
+    const fromIdb = await idbGet<Project>(`recent:${id}`);
+    if (fromIdb) return fromIdb;
+  } catch {
+    /* fall through */
+  }
+  return loadRecentSnapshot(id);
+}
+
 /**
  * Push or update a recent project entry after open / manual save.
+ * Full project snapshots go to IndexedDB so image-heavy projects stay openable.
+ * localStorage keeps the entry list (+ small snapshots when they fit).
  */
 export function pushRecentProject(project: Project, displayName?: string): void {
   const name =
@@ -184,19 +280,27 @@ export function pushRecentProject(project: Project, displayName?: string): void 
 
   const store = readRecentStore();
   const entries = store.entries.filter((e) => e.id !== id && e.name !== name);
-  let hasSnapshot = false;
   const snapshots = { ...store.snapshots };
 
+  // Always try IndexedDB for the full snapshot (async)
+  void idbSet(`recent:${id}`, project).catch((err) => {
+    console.warn("[recent] IndexedDB snapshot failed:", err);
+  });
+
+  let hasSnapshot = true; // IDB write assumed; open path falls back to LS
   try {
     const json = JSON.stringify(project);
     if (byteLength(json) <= MAX_JSON_BYTES) {
       snapshots[id] = project;
       hasSnapshot = true;
     } else {
+      // Too large for localStorage — keep entry enabled via IDB
       delete snapshots[id];
+      hasSnapshot = true;
     }
   } catch {
     delete snapshots[id];
+    hasSnapshot = true; // still try IDB on open
   }
 
   entries.unshift({
@@ -206,12 +310,12 @@ export function pushRecentProject(project: Project, displayName?: string): void 
     hasSnapshot,
   });
 
-  // Cap list and prune orphan snapshots
   const capped = entries.slice(0, RECENT_LIMIT);
   const keep = new Set(capped.map((e) => e.id));
   for (const key of Object.keys(snapshots)) {
     if (!keep.has(key)) delete snapshots[key];
   }
+  // Best-effort prune IDB orphans is skipped (keys unknown without list)
 
   writeRecentStore({ entries: capped, snapshots });
 }
@@ -223,10 +327,15 @@ export function removeRecentProject(id: string): void {
     entries: store.entries.filter((e) => e.id !== id),
     snapshots: store.snapshots,
   });
+  void idbDel(`recent:${id}`);
 }
 
 export function clearRecentProjects(): void {
   try {
+    const store = readRecentStore();
+    for (const e of store.entries) {
+      void idbDel(`recent:${e.id}`);
+    }
     localStorage.removeItem(RECENT_KEY);
   } catch {
     /* ignore */

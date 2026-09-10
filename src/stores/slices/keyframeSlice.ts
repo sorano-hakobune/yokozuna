@@ -119,7 +119,7 @@ export const createKeyframeSlice: StateCreator<
           partial.easingBezier = [0.42, 0, 0.58, 1];
         }
       } else if (easing !== undefined) {
-        // keep bezier data around in case user switches back 窶・no clear
+        // keep bezier data around in case user switches back — no clear
       }
       if (tween !== "motion") {
         partial.motionPath = undefined;
@@ -211,6 +211,17 @@ export const createKeyframeSlice: StateCreator<
           elements: cloneElements(kf.elements),
           tween: kf.tween,
           ...(kf.easing ? { easing: kf.easing } : {}),
+          ...(kf.easingBezier
+            ? { easingBezier: [...kf.easingBezier] as Keyframe["easingBezier"] }
+            : {}),
+          ...(kf.motionPath
+            ? {
+                motionPath: {
+                  ...kf.motionPath,
+                  points: kf.motionPath.points.map((p) => ({ ...p })),
+                },
+              }
+            : {}),
         },
       });
     },
@@ -235,6 +246,17 @@ export const createKeyframeSlice: StateCreator<
           frame,
           tween: clip.tween,
           ...(clip.easing ? { easing: clip.easing } : {}),
+          ...(clip.easingBezier
+            ? { easingBezier: [...clip.easingBezier] as Keyframe["easingBezier"] }
+            : {}),
+          ...(clip.motionPath
+            ? {
+                motionPath: {
+                  ...clip.motionPath,
+                  points: clip.motionPath.points.map((p) => ({ ...p })),
+                },
+              }
+            : {}),
           elements,
         };
         const keyframes = existing
@@ -282,6 +304,19 @@ export const createKeyframeSlice: StateCreator<
                     frame: toFrame,
                     tween: source.tween,
                     ...(source.easing ? { easing: source.easing } : {}),
+                    ...(source.easingBezier
+                      ? {
+                          easingBezier: [...source.easingBezier] as Keyframe["easingBezier"],
+                        }
+                      : {}),
+                    ...(source.motionPath
+                      ? {
+                          motionPath: {
+                            ...source.motionPath,
+                            points: source.motionPath.points.map((p) => ({ ...p })),
+                          },
+                        }
+                      : {}),
                     elements: cloneElements(source.elements),
                   };
                   return {
@@ -306,7 +341,7 @@ export const createKeyframeSlice: StateCreator<
         const comp = state.project.compositions[compId];
         if (!comp) return state;
         const f = Math.max(0, Math.min(comp.duration - 1, Math.round(frame)));
-        const trimmed = (name || "").trim() || `繝ｩ繝吶Ν ${f}`;
+        const trimmed = (name || "").trim() || `ラベル ${f}`;
         const rest = (comp.labels ?? []).filter((l) => l.frame !== f);
         id = generateId("label");
         const lab: FrameLabel = {

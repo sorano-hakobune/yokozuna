@@ -229,6 +229,8 @@ export function getProjectSelectionState(project: Project) {
       elements: Element[];
       tween: TweenType;
       easing?: EasingType;
+      easingBezier?: Keyframe["easingBezier"];
+      motionPath?: Keyframe["motionPath"];
     } | null,
     _clipboardPasteGen: 0,
   };
@@ -240,12 +242,21 @@ export function replaceLayerKeyframe(
   elements: Element[],
 ): Layer {
   const existing = layer.keyframes.find((item) => item.frame === frame);
-  // Preserve tween / easing when only elements change (e.g. transform edit).
-  // Brand-new keyframes default to tween: "none".
+  // Preserve tween / easing / custom-bezier / motion path when only elements
+  // change (e.g. transform edit). Brand-new keyframes default to tween: "none".
   const keyframe: Keyframe = {
     frame,
     tween: existing?.tween ?? "none",
     ...(existing?.easing ? { easing: existing.easing } : {}),
+    ...(existing?.easingBezier ? { easingBezier: [...existing.easingBezier] as Keyframe["easingBezier"] } : {}),
+    ...(existing?.motionPath
+      ? {
+          motionPath: {
+            ...existing.motionPath,
+            points: existing.motionPath.points.map((p) => ({ ...p })),
+          },
+        }
+      : {}),
     elements,
   };
 

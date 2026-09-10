@@ -165,13 +165,6 @@
   box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.35);
 }
 
-.layer-type {
-  flex: 0 0 52px;
-  color: #80929b;
-  font-size: 10px;
-  text-align: right;
-}
-
 .layer-type-btn {
   flex: 0 0 52px;
   border: 1px solid #4a5d66;
@@ -220,7 +213,6 @@
   box-shadow: inset 3px 0 #e05a3c;
 }
 
-.layer-header-row.selected .layer-type,
 .layer-header-row.selected .layer-type-btn {
   color: #f0c4b0;
   border-color: #c96a4a;
@@ -351,10 +343,6 @@
   background: #e05a3c;
 }
 
-.keyframe.has-tween {
-  box-shadow: 0 0 0 1px #2a8;
-}
-
 .keyframe.dragging {
   opacity: 0.35;
   cursor: grabbing;
@@ -423,7 +411,6 @@
     width: 168px;
   }
 
-  .layer-type,
   .layer-col {
     display: none;
   }

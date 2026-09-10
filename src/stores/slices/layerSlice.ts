@@ -15,7 +15,7 @@ import { generateId } from "@/lib/project";
 export const createLayerSlice: StateCreator<ProjectState, [], [], LayerSlice> = (
   set,
 ) => ({
-    addLayer: (name = "譁ｰ隕上Ξ繧､繝､繝ｼ", parentId) => {
+    addLayer: (name = "新規レイヤー", parentId) => {
       const id = generateId("layer");
       const newLayer: Layer = {
         id,
@@ -63,7 +63,7 @@ export const createLayerSlice: StateCreator<ProjectState, [], [], LayerSlice> = 
       return id;
     },
 
-    addFolder: (name = "譁ｰ隕上ヵ繧ｩ繝ｫ繝") => {
+    addFolder: (name = "新規フォルダ") => {
       const id = generateId("folder");
       set((state) => {
         const target = getTimelineTarget(state);
@@ -196,7 +196,7 @@ export const createLayerSlice: StateCreator<ProjectState, [], [], LayerSlice> = 
         const cloned: Layer = {
           ...JSON.parse(JSON.stringify(src)),
           id: newId,
-          name: `${src.name} 縺ｮ繧ｳ繝斐・`,
+          name: `${src.name} のコピー`,
         };
         // Re-id elements inside keyframes to avoid selection/id collisions
         cloned.keyframes = cloned.keyframes.map((kf) => ({

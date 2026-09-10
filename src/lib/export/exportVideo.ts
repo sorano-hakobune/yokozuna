@@ -1,5 +1,5 @@
 import type { Project } from "@/types/project";
-import { downloadBlob, sanitizeFileName, sleep } from "@/lib/file-utils";
+import { saveBlobAs, sanitizeFileName, sleep } from "@/lib/file-utils";
 import {
   preloadProjectImages,
   renderCompositionFrame,
@@ -311,7 +311,15 @@ export async function exportWebmVideo(
   }
 
   const blob = new Blob(chunks, { type: mimeType.split(";")[0] || "video/webm" });
-  downloadBlob(blob, fileName);
+  const saveResult = await saveBlobAs(blob, {
+    fileName,
+    extensions: ["webm"],
+    description: "WebM Video",
+    mimeTypes: ["video/webm"],
+  });
+  if (saveResult.status === "cancelled") {
+    return { exported: 0, cancelled: true, fileName };
+  }
 
   return { exported, cancelled, fileName };
 }

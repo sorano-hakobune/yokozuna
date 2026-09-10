@@ -33,6 +33,11 @@ import {
   getViewportCoordinates as getViewportPoint,
 } from "./stageGeometry";
 import { hitTestTopElement, findHitElement } from "@/lib/stage/hitTest";
+import {
+  findClosedShapeAtPoint,
+  floodFillContour,
+  contourToFillShape,
+} from "@/lib/draw/fillRegion";
 import { useStagePanZoom } from "./hooks/useStagePanZoom";
 import { useStageContextMenu } from "./hooks/useStageContextMenu";
 import { LayerStack } from "./parts/LayerStack";
@@ -46,6 +51,12 @@ import type {
   VertexSession,
 } from "./types/stageSession";
 import { StageContextMenu } from "./StageContextMenu";
+import {
+  TextEditOverlay,
+  sessionFromShape,
+  measureTextBox,
+  type TextEditSession,
+} from "./TextEditOverlay";
 import {
   hitTestPathEdit,
   insertVertexOnEdge,
@@ -71,7 +82,9 @@ import {
   elementWorldTransform,
   getLocalBounds,
   hitTestHandle,
+  reanchorPivot,
   scaleFromHandleDrag,
+  worldToLocal,
   type HandleId,
 } from "./transformGeometry";
 
@@ -83,6 +96,7 @@ const StageInner: React.FC = () => {
   const [isDragging, setIsDragging] = useState(false);
   const [isDrawing, setIsDrawing] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [textEdit, setTextEdit] = useState<TextEditSession | null>(null);
   const [previewPoints, setPreviewPoints] = useState<
     { x: number; y: number }[]
   >([]);
@@ -165,8 +179,13 @@ const StageInner: React.FC = () => {
   const duplicateSelection = useProjectStore((s) => s.duplicateSelection);
   const reorderSelectionZ = useProjectStore((s) => s.reorderSelectionZ);
   const clipboard = useProjectStore((s) => s.clipboard);
-  const { contextMenu, setContextMenu, handleContextMenu, handleDeleteSelection } =
-    useStageContextMenu(svgRef);
+  const {
+    contextMenu,
+    setContextMenu,
+    handleContextMenu,
+    handleDeleteSelection,
+    handleResetPivot,
+  } = useStageContextMenu(svgRef);
   const setPointerPos = useProjectStore((s) => s.setPointerPos);
   const addAsset = useProjectStore((s) => s.addAsset);
   const addBitmapElement = useProjectStore((s) => s.addBitmapElement);
@@ -270,32 +289,45 @@ const StageInner: React.FC = () => {
   const [activeGuideId, setActiveGuideId] = useState<string | null>(null);
 
   const eraseStroke = (brushPoints: { x: number; y: number }[]) => {
-    const latestProject = useProjectStore.getState().project;
-    const latestComposition =
-      latestProject.compositions[latestProject.activeCompositionId];
-    if (!latestComposition) return;
+    const store = useProjectStore.getState();
+    const target = store.editingSymbolId
+      ? {
+          layers:
+            store.project.symbols[store.editingSymbolId]?.layers ?? [],
+        }
+      : {
+          layers:
+            store.project.compositions[store.project.activeCompositionId]
+              ?.layers ?? [],
+        };
+    if (target.layers.length === 0) return;
 
-    for (const layer of latestComposition.layers) {
-      if (!layer.visible || layer.locked) continue;
-      const elements = getElementsAtFrame(layer.keyframes, currentFrame);
-      for (let i = elements.length - 1; i >= 0; i -= 1) {
-        const element = elements[i];
-        if (element.type !== "shape") continue;
-        const shape = element as ShapeElement;
-        const fragments = erasePathStroke(
-          shape,
-          brushPoints,
-          drawingStrokeWidth,
-        );
-        if (fragments.length !== 1 || fragments[0].id !== shape.id) {
-          replaceShapeWithFragments(
-            layer.id,
-            currentFrame,
-            shape.id,
-            fragments,
+    store.beginHistoryBatch();
+    try {
+      for (const layer of target.layers) {
+        if (!layer.visible || layer.locked) continue;
+        const elements = getElementsAtFrame(layer.keyframes, currentFrame);
+        for (let i = elements.length - 1; i >= 0; i -= 1) {
+          const element = elements[i];
+          if (element.type !== "shape") continue;
+          const shape = element as ShapeElement;
+          const fragments = erasePathStroke(
+            shape,
+            brushPoints,
+            drawingStrokeWidth,
           );
+          if (fragments.length !== 1 || fragments[0].id !== shape.id) {
+            replaceShapeWithFragments(
+              layer.id,
+              currentFrame,
+              shape.id,
+              fragments,
+            );
+          }
         }
       }
+    } finally {
+      store.endHistoryBatch();
     }
   };
 
@@ -463,7 +495,7 @@ const StageInner: React.FC = () => {
       return;
     }
 
-    // 塗りつぶし: クリックした図形の fill を現在の塗り色に
+    // 塗りつぶし: 既存図形の色変更 + 閉じた領域の塗りつぶし
     if (selectedTool === "paintbucket") {
       const hit = hitTestTopElement(coords, {
         layers,
@@ -475,21 +507,80 @@ const StageInner: React.FC = () => {
       const found = hit ? findHitElement(layers, currentFrame, hit) : null;
       if (found && found.element.type === "shape") {
         const shape = found.element as ShapeElement;
-        // 線専用図形は stroke を更新、それ以外は fill
-        if (
+        // すでに fill がある、または線専用 → 従来どおり色を差し替え
+        const isStrokeOnly =
           shape.shapeType === "line" ||
-          (shape.fill === "none" && shape.stroke && shape.stroke !== "none")
-        ) {
+          (shape.fill === "none" && shape.stroke && shape.stroke !== "none");
+        if (isStrokeOnly && shape.shapeType === "line" && !shape.closePath) {
           updateElement(found.layer.id, currentFrame, shape.id, {
             stroke: drawingStroke,
           });
-        } else {
+          setSelectedLayerId(found.layer.id);
+          setSelectedElementId(shape.id);
+          return;
+        }
+        if (!isStrokeOnly || (shape.fill && shape.fill !== "none")) {
+          updateElement(found.layer.id, currentFrame, shape.id, {
+            fill: drawingFill,
+            fillGradient: undefined,
+          });
+          setSelectedLayerId(found.layer.id);
+          setSelectedElementId(shape.id);
+          return;
+        }
+        // stroke-only closed path: set fill on the same shape
+        if (
+          shape.closePath ||
+          shape.shapeType === "rectangle" ||
+          shape.shapeType === "circle"
+        ) {
           updateElement(found.layer.id, currentFrame, shape.id, {
             fill: drawingFill,
           });
+          setSelectedLayerId(found.layer.id);
+          setSelectedElementId(shape.id);
+          return;
         }
-        setSelectedLayerId(found.layer.id);
-        setSelectedElementId(shape.id);
+        // open path stroke hit — fall through to region detection
+      }
+
+      // 閉じた図形の内部をクリック（fill が none でも）
+      const closed = findClosedShapeAtPoint(layers, currentFrame, coords);
+      if (closed) {
+        updateElement(closed.layerId, currentFrame, closed.shape.id, {
+          fill: drawingFill,
+          fillGradient: undefined,
+        });
+        setSelectedLayerId(closed.layerId);
+        setSelectedElementId(closed.shape.id);
+        return;
+      }
+
+      // 複数ストロークで囲まれた領域: ラスター flood-fill → パス生成
+      // 開いたパスの場合は境界に到達するため null を返し、全体塗りを防ぐ
+      try {
+        const contour = floodFillContour(
+          layers,
+          project,
+          currentFrame,
+          coords,
+        );
+        if (contour && contour.length >= 3) {
+          const active =
+            layers.find((l) => l.id === selectedLayerId) ??
+            layers.find((l) => l.visible && !l.locked && l.type !== "folder");
+          if (active && !active.locked && active.type !== "folder") {
+            const fillShape = contourToFillShape(contour, drawingFill);
+            useProjectStore
+              .getState()
+              .addShapeToLayer(active.id, currentFrame, fillShape);
+            setSelectedLayerId(active.id);
+            setSelectedElementId(fillShape.id);
+          }
+        }
+        // else: open region — do nothing (safe)
+      } catch {
+        // ignore flood-fill failures
       }
       return;
     }
@@ -639,6 +730,9 @@ const StageInner: React.FC = () => {
               initialScaleX: selected.scaleX || 1,
               initialScaleY: selected.scaleY || 1,
               rotationGrabOffset: (selected.rotation ?? 0) - (grabAngle + 90),
+              initialPivot: selected.pivot
+                ? { x: selected.pivot.x, y: selected.pivot.y }
+                : { x: 0, y: 0 },
             };
             setSelectedLayerId(layerId);
             setActiveHandle(handle);
@@ -696,29 +790,62 @@ const StageInner: React.FC = () => {
       }
     }
 
-    // 文字ツール: クリック位置にテキストを作成（編集はプロンプト）
+    // 文字ツール: 既存テキスト上なら編集、空白なら新規作成
     if (selectedTool === "text") {
       if (!activeLayer || activeLayer.locked || activeLayer.type === "folder") {
         releasePointer(e.pointerId);
         activePointerIdRef.current = null;
         return;
       }
-      const orient = useProjectStore.getState().textOrientation;
-      const initial = orient === "vertical" ? "テキスト" : "テキスト";
-      const entered = window.prompt("テキストを入力", initial);
-      if (entered === null) {
-        releasePointer(e.pointerId);
-        activePointerIdRef.current = null;
-        return;
+      // Hit-test first: click existing text → edit that shape (not create another)
+      {
+        const topHit = hitTestTopElement(coords, {
+          layers,
+          project,
+          currentFrame,
+          skipLocked: true,
+        });
+        const found = topHit
+          ? findHitElement(layers, currentFrame, topHit)
+          : null;
+        if (
+          found &&
+          found.element.type === "shape" &&
+          (found.element as ShapeElement).shapeType === "text"
+        ) {
+          const shape = found.element as ShapeElement;
+          setSelectedLayerId(found.layer.id);
+          setSelectedElementId(shape.id);
+          setTextEdit(sessionFromShape(shape, found.layer.id));
+          releasePointer(e.pointerId);
+          activePointerIdRef.current = null;
+          return;
+        }
       }
-      const shape = createTextShape(coords.x, coords.y, entered || "テキスト", {
+      const orient = useProjectStore.getState().textOrientation;
+      const fontSize = 24;
+      const box = measureTextBox(
+        "",
+        fontSize,
+        orient === "vertical" ? "vertical" : "horizontal",
+      );
+      setTextEdit({
+        elementId: null,
+        layerId: activeLayer.id,
+        x: coords.x,
+        y: coords.y,
+        text: "",
+        fontSize,
+        fontFamily: "sans-serif",
         fill: drawingFill,
-        textOrientation: orient,
-        fontSize: 24,
+        textOrientation: orient === "vertical" ? "vertical" : "horizontal",
+        width: box.width,
+        height: box.height,
+        rotation: 0,
+        scaleX: 1,
+        scaleY: 1,
       });
-      useProjectStore.getState().addShapeToLayer(activeLayer.id, currentFrame, shape);
       setSelectedLayerId(activeLayer.id);
-      setSelectedElementId(shape.id);
       releasePointer(e.pointerId);
       activePointerIdRef.current = null;
       return;
@@ -788,39 +915,22 @@ const StageInner: React.FC = () => {
             setPathEditMode(true);
             return;
           }
-          // Double-click text → edit content
+          // Double-click text → in-place edit (select tool)
           if (
             !additive &&
             el.type === "shape" &&
             (el as ShapeElement).shapeType === "text" &&
             prev &&
             prev.id === el.id &&
-            now - prev.time < 350
+            now - prev.time < 500
           ) {
             lastClickRef.current = null;
             const shape = el as ShapeElement;
-            const next = window.prompt(
-              "テキストを編集",
-              shape.text ?? "",
-            );
-            if (next !== null) {
-              const fontSize = shape.fontSize ?? 24;
-              const orient = shape.textOrientation ?? "horizontal";
-              const content = next;
-              const width =
-                orient === "vertical"
-                  ? fontSize * 1.4
-                  : Math.max(fontSize, Math.max(1, content.length) * fontSize * 0.6);
-              const height =
-                orient === "vertical"
-                  ? Math.max(fontSize, Math.max(1, content.length) * fontSize * 1.1)
-                  : fontSize * 1.4;
-              updateElement(layer.id, currentFrame, shape.id, {
-                text: content,
-                width,
-                height,
-              });
-            }
+            setSelectedLayerId(layer.id);
+            setSelectedElementId(shape.id);
+            setTextEdit(sessionFromShape(shape, layer.id));
+            releasePointer(e.pointerId);
+            activePointerIdRef.current = null;
             return;
           }
           lastClickRef.current = { id: el.id, time: now };
@@ -1202,6 +1312,45 @@ const StageInner: React.FC = () => {
     );
     if (!selected) return;
 
+    if (session.handle === "pivot") {
+      // Drag pivot only: update local pivot + compensate x/y so geometry stays put
+      // Use initial pivot from session start if stored via initial - fall back to current
+      const initialPivot = (session as { initialPivot?: { x: number; y: number } }).initialPivot
+        ?? selected.pivot
+        ?? { x: 0, y: 0 };
+      // Desired world position of pivot is the pointer (snapped)
+      const snapped = maybeSnap(coords, e);
+      // Convert desired world pivot to local under the *geometry-fixed* frame at drag start
+      // At drag start, W(L)=T0+R0*S0*(L-P0). We want new pivot at snapped world with geometry fixed.
+      // Local coords of the point under the cursor relative to geometric content:
+      const local = worldToLocal(snapped, {
+        x: session.initialX,
+        y: session.initialY,
+        rotation: session.initialRotation,
+        scaleX: session.initialScaleX,
+        scaleY: session.initialScaleY,
+        pivotX: initialPivot.x,
+        pivotY: initialPivot.y,
+      });
+      const next = reanchorPivot(
+        {
+          x: session.initialX,
+          y: session.initialY,
+          rotation: session.initialRotation,
+          scaleX: session.initialScaleX,
+          scaleY: session.initialScaleY,
+          pivot: initialPivot,
+        },
+        local,
+      );
+      updateElement(session.layerId, currentFrame, session.elementId, {
+        x: next.x,
+        y: next.y,
+        pivot: next.pivot,
+      });
+      return;
+    }
+
     if (session.handle === "move") {
       const deltaX = coords.x - session.startPointer.x;
       const deltaY = coords.y - session.startPointer.y;
@@ -1241,12 +1390,18 @@ const StageInner: React.FC = () => {
           ? project.symbols[selected.symbolId]
           : undefined;
     const bounds = getLocalBounds(selected, asset);
+    const sessionPivot =
+      (session as { initialPivot?: { x: number; y: number } }).initialPivot ??
+      selected.pivot ??
+      { x: 0, y: 0 };
     const startT = {
       x: session.initialX,
       y: session.initialY,
       rotation: session.initialRotation,
       scaleX: session.initialScaleX,
       scaleY: session.initialScaleY,
+      pivotX: sessionPivot.x,
+      pivotY: sessionPivot.y,
     };
     const uniform =
       e.shiftKey ||
@@ -1618,6 +1773,9 @@ const StageInner: React.FC = () => {
             stageWidth={settings.width}
             stageHeight={settings.height}
             selectedLayerId={selectedLayerId}
+            suppressElementIds={
+              textEdit?.elementId ? [textEdit.elementId] : undefined
+            }
           />
           <SelectionOverlays
             layers={layers}
@@ -1671,6 +1829,49 @@ const StageInner: React.FC = () => {
           }
           return null;
         })()}
+      {textEdit && (
+        <TextEditOverlay
+          session={textEdit}
+          svgElement={svgRef.current}
+          canvasPan={canvasPan}
+          zoom={canvasZoom}
+          onCancel={() => setTextEdit(null)}
+          onCommit={(content) => {
+            const session = textEdit;
+            setTextEdit(null);
+            // Keep empty as empty for edit; only default when creating brand-new
+            const textVal =
+              content === "" && !session.elementId
+                ? "テキスト"
+                : content;
+            if (session.elementId) {
+              // Edit existing: only text + measured box, never reset other attrs
+              const fontSize = session.fontSize;
+              const orient = session.textOrientation;
+              const box = measureTextBox(textVal || " ", fontSize, orient);
+              updateElement(session.layerId, currentFrame, session.elementId, {
+                text: textVal,
+                width: box.width,
+                height: box.height,
+              });
+            } else {
+              const orient = session.textOrientation;
+              const fontSize = session.fontSize;
+              const shape = createTextShape(session.x, session.y, textVal, {
+                fill: session.fill,
+                textOrientation: orient,
+                fontSize,
+                fontFamily: session.fontFamily,
+              });
+              useProjectStore
+                .getState()
+                .addShapeToLayer(session.layerId, currentFrame, shape);
+              setSelectedLayerId(session.layerId);
+              setSelectedElementId(shape.id);
+            }
+          }}
+        />
+      )}
       {contextMenu && (
         <StageContextMenu
           menu={contextMenu}
@@ -1703,6 +1904,13 @@ const StageInner: React.FC = () => {
           })()}
           onEditPathVertices={() => {
             setPathEditMode(true);
+            setContextMenu(null);
+          }}
+          canResetPivot={
+            selectedElementIds.length === 1 || Boolean(selectedElementId)
+          }
+          onResetPivot={() => {
+            handleResetPivot();
             setContextMenu(null);
           }}
         />

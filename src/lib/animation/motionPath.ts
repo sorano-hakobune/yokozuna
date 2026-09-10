@@ -138,13 +138,16 @@ export function motionPathFromShapePoints(
   rotationDeg = 0,
   scaleX = 1,
   scaleY = 1,
+  pivot?: Pt,
 ): MotionPath {
   const rad = (rotationDeg * Math.PI) / 180;
   const cos = Math.cos(rad);
   const sin = Math.sin(rad);
+  const px = pivot?.x ?? 0;
+  const py = pivot?.y ?? 0;
   const map = (p: PathPoint): PathPoint => {
-    const lx = p.x * scaleX;
-    const ly = p.y * scaleY;
+    const lx = (p.x - px) * scaleX;
+    const ly = (p.y - py) * scaleY;
     const wx = origin.x + lx * cos - ly * sin;
     const wy = origin.y + lx * sin + ly * cos;
     const out: PathPoint = { x: wx, y: wy, smooth: p.smooth };

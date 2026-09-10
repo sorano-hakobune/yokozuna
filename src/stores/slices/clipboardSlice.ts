@@ -28,7 +28,7 @@ export const createClipboardSlice: StateCreator<
     keyframeClipboard: null,
     _clipboardPasteGen: 0,
     copyElement: (layerId, frame, elementId) => {
-      // Legacy single-id API 竊・multi clipboard
+      // Legacy single-id API → multi clipboard
       const state = get();
       const target = getTimelineTarget(state);
       if (!target) return;

@@ -1,5 +1,6 @@
 import type { Element, ShapeElement, Symbol as ProjectSymbol } from "@/types/project";
 import { samplePathPoints } from "@/lib/draw/pathBezier";
+import { getLocalBounds } from "./transformGeometry";
 
 type Point = { x: number; y: number };
 
@@ -47,16 +48,29 @@ export function isPointInShape(
   const sin = Math.sin(angle);
   const scaleX = shape.scaleX || 1;
   const scaleY = shape.scaleY || 1;
-  const localX = (dx * cos + dy * sin) / scaleX;
-  const localY = (-dx * sin + dy * cos) / scaleY;
+  const pivX = shape.pivot?.x ?? 0;
+  const pivY = shape.pivot?.y ?? 0;
+  // Inverse of W = T + R*S*(L - P)
+  const localX = (dx * cos + dy * sin) / scaleX + pivX;
+  const localY = (-dx * sin + dy * cos) / scaleY + pivY;
 
   switch (shape.shapeType) {
     case "rectangle":
-    case "text":
       return (
         Math.abs(localX) <= (shape.width ?? 100) / 2 &&
         Math.abs(localY) <= (shape.height ?? 100) / 2
       );
+    case "text": {
+      // Same actual visual bounds as the selection box (stale width/height safe).
+      const b = getLocalBounds(shape);
+      const pad = 2;
+      return (
+        localX >= b.cx - b.halfW - pad &&
+        localX <= b.cx + b.halfW + pad &&
+        localY >= b.cy - b.halfH - pad &&
+        localY <= b.cy + b.halfH + pad
+      );
+    }
     case "circle": {
       const radius = shape.radius ?? 50;
       return localX * localX + localY * localY <= radius * radius;
@@ -85,12 +99,10 @@ export function isPointInShape(
         return Math.hypot(localX - nearestX, localY - nearestY) <= tolerance;
       });
       if (onStroke) return true;
-      // Closed filled path: point-in-polygon on sampled contour
+      // Closed path interior (fill optional — paint-bucket / hit need this)
       if (
         shape.shapeType === "path" &&
         closed &&
-        shape.fill &&
-        shape.fill !== "none" &&
         sampled.length >= 3
       ) {
         let inside = false;
@@ -128,8 +140,10 @@ export function isPointInBitmap(
   const angle = (element.rotation * Math.PI) / 180;
   const cos = Math.cos(angle);
   const sin = Math.sin(angle);
-  const localX = (dx * cos + dy * sin) / (element.scaleX || 1);
-  const localY = (-dx * sin + dy * cos) / (element.scaleY || 1);
+  const pivX = element.pivot?.x ?? 0;
+  const pivY = element.pivot?.y ?? 0;
+  const localX = (dx * cos + dy * sin) / (element.scaleX || 1) + pivX;
+  const localY = (-dx * sin + dy * cos) / (element.scaleY || 1) + pivY;
   return Math.abs(localX) <= width / 2 && Math.abs(localY) <= height / 2;
 }
 
@@ -146,7 +160,9 @@ export function isPointInInstance(
   const angle = ((element.rotation ?? 0) * Math.PI) / 180;
   const cos = Math.cos(angle);
   const sin = Math.sin(angle);
-  const localX = (dx * cos + dy * sin) / (element.scaleX || 1);
-  const localY = (-dx * sin + dy * cos) / (element.scaleY || 1);
+  const pivX = element.pivot?.x ?? 0;
+  const pivY = element.pivot?.y ?? 0;
+  const localX = (dx * cos + dy * sin) / (element.scaleX || 1) + pivX;
+  const localY = (-dx * sin + dy * cos) / (element.scaleY || 1) + pivY;
   return Math.abs(localX) <= width / 2 && Math.abs(localY) <= height / 2;
 }

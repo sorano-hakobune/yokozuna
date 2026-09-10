@@ -46,7 +46,7 @@ export const createElementSlice: StateCreator<
                 };
               }
 
-              // 逶ｴ蜑阪・繧ｭ繝ｼ繝輔Ξ繝ｼ繝縺ｮ隕∫ｴ繧偵さ繝斐・縺励※譁ｰ繧ｭ繝ｼ繝輔Ξ繝ｼ繝繧剃ｽ懊ｋ
+              // 直前のキーフレームの要素をコピーして新キーフレームを作る
               const baseElements = getPreviousKeyframeElements(
                 layer.keyframes,
                 frame,

@@ -4,6 +4,7 @@ import type { Layer } from "@/types/project";
 import { useProjectStore } from "@/stores/projectStore";
 import { createImageAssetFromFile } from "@/lib/project";
 import { KeyframeMarker } from "./KeyframeMarker";
+import { clampMenuPosition } from "@/components/ui/ContextMenu";
 
 interface LayerRowProps {
   layer: Layer;
@@ -29,6 +30,37 @@ export function LayerRow({ layer, zoom, currentFrame }: LayerRowProps) {
     frame: number;
   } | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!menu) return;
+    const onDown = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenu(null);
+      }
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMenu(null);
+    };
+    const timer = window.setTimeout(() => {
+      document.addEventListener("mousedown", onDown, true);
+      document.addEventListener("keydown", onKey, true);
+    }, 0);
+    return () => {
+      window.clearTimeout(timer);
+      document.removeEventListener("mousedown", onDown, true);
+      document.removeEventListener("keydown", onKey, true);
+    };
+  }, [menu]);
+
+  useEffect(() => {
+    if (!menu) return;
+    const el = menuRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const { left, top } = clampMenuPosition(menu.x, menu.y, rect.width, rect.height);
+    el.style.left = `${left}px`;
+    el.style.top = `${top}px`;
+  }, [menu]);
   const lastClickRef = useRef<{ frame: number; time: number } | null>(null);
 
   const sortedKeyframes = useMemo(
@@ -77,16 +109,6 @@ export function LayerRow({ layer, zoom, currentFrame }: LayerRowProps) {
     }
     return spans;
   }, [sortedKeyframes, project]);
-
-  useEffect(() => {
-    if (!menu) return;
-    const onDoc = (e: MouseEvent) => {
-      if (menuRef.current?.contains(e.target as Node)) return;
-      setMenu(null);
-    };
-    document.addEventListener("mousedown", onDoc);
-    return () => document.removeEventListener("mousedown", onDoc);
-  }, [menu]);
 
   const frameFromEvent = (e: React.MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();

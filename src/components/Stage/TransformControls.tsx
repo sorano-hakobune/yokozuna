@@ -32,7 +32,7 @@ export function TransformControls({
   const t = elementWorldTransform(element);
   const handles = getHandleWorldPositions(bounds, t);
   const rotateLocal = getRotateHandleLocal(bounds);
-  const topMid = localToWorld({ x: 0, y: -bounds.halfH }, t);
+  const topMid = localToWorld({ x: bounds.cx, y: bounds.cy - bounds.halfH }, t);
   const rotateWorld = localToWorld(rotateLocal, t);
 
   const invZoom = 1 / Math.max(0.15, zoom);
@@ -41,15 +41,15 @@ export function TransformControls({
   const outerW = 3 * invZoom;
 
   const boxCorners: { x: number; y: number }[] = [
-    localToWorld({ x: -bounds.halfW, y: -bounds.halfH }, t),
-    localToWorld({ x: bounds.halfW, y: -bounds.halfH }, t),
-    localToWorld({ x: bounds.halfW, y: bounds.halfH }, t),
-    localToWorld({ x: -bounds.halfW, y: bounds.halfH }, t),
+    localToWorld({ x: bounds.cx - bounds.halfW, y: bounds.cy - bounds.halfH }, t),
+    localToWorld({ x: bounds.cx + bounds.halfW, y: bounds.cy - bounds.halfH }, t),
+    localToWorld({ x: bounds.cx + bounds.halfW, y: bounds.cy + bounds.halfH }, t),
+    localToWorld({ x: bounds.cx - bounds.halfW, y: bounds.cy + bounds.halfH }, t),
   ];
   const boxPath =
     boxCorners.map((p, i) => `${i ? "L" : "M"}${p.x} ${p.y}`).join(" ") + " Z";
 
-  const scaleIds: Exclude<HandleId, "move" | "rotate">[] = [
+  const scaleIds: Exclude<HandleId, "move" | "rotate" | "pivot">[] = [
     "nw",
     "n",
     "ne",
@@ -122,6 +122,36 @@ export function TransformControls({
           />
         );
       })}
+      {/* Pivot / transform origin — distinct from scale handles */}
+      <g className="pivot-marker">
+        <circle
+          cx={t.x}
+          cy={t.y}
+          r={hs * 0.55}
+          fill={activeHandle === "pivot" ? SEL_ACTIVE : "#fbbf24"}
+          stroke={SEL_STROKE}
+          strokeWidth={strokeW}
+          vectorEffect="non-scaling-stroke"
+        />
+        <line
+          x1={t.x - hs * 0.85}
+          y1={t.y}
+          x2={t.x + hs * 0.85}
+          y2={t.y}
+          stroke={SEL_STROKE}
+          strokeWidth={strokeW * 0.9}
+          vectorEffect="non-scaling-stroke"
+        />
+        <line
+          x1={t.x}
+          y1={t.y - hs * 0.85}
+          x2={t.x}
+          y2={t.y + hs * 0.85}
+          stroke={SEL_STROKE}
+          strokeWidth={strokeW * 0.9}
+          vectorEffect="non-scaling-stroke"
+        />
+      </g>
     </g>
   );
 }

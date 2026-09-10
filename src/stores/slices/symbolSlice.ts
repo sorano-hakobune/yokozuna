@@ -212,7 +212,7 @@ export const createSymbolSlice: StateCreator<
       const copy: Symbol = {
         ...JSON.parse(JSON.stringify(source)),
         id: newId,
-        name: `${source.name} 縺ｮ繧ｳ繝斐・`,
+        name: `${source.name} のコピー`,
         layers,
       };
       set((s) => ({

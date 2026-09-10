@@ -3,6 +3,7 @@ import type { EasingType, Keyframe, TweenType } from "@/types/project";
 import { useProjectStore } from "@/stores/projectStore";
 import { EASING_MENU_SHORT } from "@/lib/animation/easing";
 import { createDefaultMotionPath } from "@/lib/animation/motionPath";
+import { clampMenuPosition } from "@/components/ui/ContextMenu";
 
 interface KeyframeMarkerProps {
   layerId: string;
@@ -58,9 +59,29 @@ export function KeyframeMarker({
         setMenuOpen(false);
       }
     };
-    window.addEventListener("mousedown", onDown);
-    return () => window.removeEventListener("mousedown", onDown);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMenuOpen(false);
+    };
+    const timer = window.setTimeout(() => {
+      document.addEventListener("mousedown", onDown, true);
+      document.addEventListener("keydown", onKey, true);
+    }, 0);
+    return () => {
+      window.clearTimeout(timer);
+      document.removeEventListener("mousedown", onDown, true);
+      document.removeEventListener("keydown", onKey, true);
+    };
   }, [menuOpen]);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const el = menuRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const { left, top } = clampMenuPosition(menuPos.x, menuPos.y, rect.width, rect.height);
+    el.style.left = `${left}px`;
+    el.style.top = `${top}px`;
+  }, [menuOpen, menuPos.x, menuPos.y]);
 
   const clampFrame = useCallback(
     (frame: number) =>

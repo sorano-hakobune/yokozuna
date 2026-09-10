@@ -9,9 +9,9 @@ import { getElementsAtFrame } from "@/lib/animation/interpolate";
 import { shapeToPathD } from "@/lib/draw/pathBezier";
 import { SvgFilterDefs, elementFilterId } from "@/lib/filters";
 import { svgGradientDef } from "@/lib/draw/gradient";
+import { elementSvgTransform } from "./transformGeometry";
 
-const elementTransform = (shape: ShapeElement) =>
-  `translate(${shape.x} ${shape.y}) rotate(${shape.rotation ?? 0}) scale(${shape.scaleX ?? 1} ${shape.scaleY ?? 1})`;
+const elementTransform = (shape: ShapeElement) => elementSvgTransform(shape);
 
 type ShapeMode = "normal" | "mask" | "guide" | "mask-overlay";
 
@@ -240,7 +240,7 @@ function renderElement(
       return (
         <g
           key={`${keyPrefix}-${element.id}`}
-          transform={`translate(${element.x} ${element.y}) rotate(${element.rotation ?? 0}) scale(${element.scaleX ?? 1} ${element.scaleY ?? 1})`}
+          transform={elementSvgTransform(element)}
           opacity={mode === "guide" ? 0.5 : 1}
         >
           <rect
@@ -259,7 +259,7 @@ function renderElement(
     }
     const symbol = project.symbols[element.symbolId];
     if (!symbol) return null;
-    const transform = `translate(${element.x} ${element.y}) rotate(${element.rotation ?? 0}) scale(${element.scaleX ?? 1} ${element.scaleY ?? 1})`;
+    const transform = elementSvgTransform(element);
     const symFrame =
       symbol.type === "graphic"
         ? Math.min(currentFrame, Math.max(0, symbol.duration - 1))
@@ -310,7 +310,7 @@ function renderElement(
   if (element.type === "bitmap") {
     const asset = project.assets[element.assetId];
     if (!asset?.src || !asset.width || !asset.height) return null;
-    const transform = `translate(${element.x} ${element.y}) rotate(${element.rotation}) scale(${element.scaleX} ${element.scaleY})`;
+    const transform = elementSvgTransform(element);
     if (mode === "mask") {
       return (
         <g key={`${keyPrefix}-${element.id}`} transform={transform}>
@@ -371,11 +371,19 @@ export function renderLayerElements(
   project: Project,
   currentFrame: number,
   mode: ShapeMode = "normal",
+  /** Hide these element ids (e.g. text currently in overlay edit) */
+  suppressElementIds?: ReadonlySet<string> | string[],
 ): React.ReactNode[] {
   if (!layer.visible) return [];
-  return getElementsAtFrame(layer.keyframes, currentFrame).map((el) =>
-    renderElement(el, project, currentFrame, mode, layer.id),
-  );
+  const suppress =
+    suppressElementIds == null
+      ? null
+      : suppressElementIds instanceof Set
+        ? suppressElementIds
+        : new Set(suppressElementIds);
+  return getElementsAtFrame(layer.keyframes, currentFrame)
+    .filter((el) => !suppress || !suppress.has(el.id))
+    .map((el) => renderElement(el, project, currentFrame, mode, layer.id));
 }
 
 export { VectorShape };

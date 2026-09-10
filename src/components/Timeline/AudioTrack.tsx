@@ -1,6 +1,8 @@
-import { useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { useMemo, useRef, useState, useEffect, useCallback, type PointerEvent as ReactPointerEvent } from "react";
 import { useProjectStore } from "@/stores/projectStore";
 import type { SoundInstance } from "@/types/project";
+import { createPortal } from "react-dom";
+import { clampMenuPosition } from "@/components/ui/ContextMenu";
 
 type Props = {
   zoom: number;
@@ -31,6 +33,7 @@ export function AudioTrack({ zoom, duration }: Props) {
     y: number;
     soundId: string;
   } | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   const dragRef = useRef<{
     soundId: string;
@@ -57,7 +60,7 @@ export function AudioTrack({ zoom, duration }: Props) {
     return null;
   }
 
-  const onPointerDownClip = (
+  const onPointerDownClip = useCallback((
     e: ReactPointerEvent,
     sound: SoundInstance,
     mode: "move" | "resize-left" | "resize-right",
@@ -73,9 +76,9 @@ export function AudioTrack({ zoom, duration }: Props) {
       originStart: sound.startFrame,
       originDur: sound.durationFrames,
     };
-  };
+  }, [setSelectedSoundId]);
 
-  const onPointerMove = (e: ReactPointerEvent) => {
+  const onPointerMove = useCallback((e: ReactPointerEvent) => {
     const drag = dragRef.current;
     if (!drag) return;
     const dx = e.clientX - drag.originX;
@@ -95,10 +98,120 @@ export function AudioTrack({ zoom, duration }: Props) {
       const dur = Math.max(1, end - start);
       updateSound(drag.soundId, { startFrame: start, durationFrames: dur });
     }
-  };
+  }, [zoom, duration, updateSound]);
 
-  const onPointerUp = () => {
+  const onPointerUp = useCallback(() => {
     dragRef.current = null;
+  }, []);
+
+  // Context menu: outside click / Escape / position clamp
+  useEffect(() => {
+    if (!menu) return;
+    const onDown = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenu(null);
+      }
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMenu(null);
+    };
+    const timer = window.setTimeout(() => {
+      document.addEventListener("mousedown", onDown, true);
+      document.addEventListener("keydown", onKey, true);
+    }, 0);
+    return () => {
+      window.clearTimeout(timer);
+      document.removeEventListener("mousedown", onDown, true);
+      document.removeEventListener("keydown", onKey, true);
+    };
+  }, [menu, setMenu]);
+
+  useEffect(() => {
+    if (!menu) return;
+    const el = menuRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const { left, top } = clampMenuPosition(menu.x, menu.y, rect.width, rect.height);
+    el.style.left = `${left}px`;
+    el.style.top = `${top}px`;
+  }, [menu]);
+
+  const renderMenu = () => {
+    if (!menu) return null;
+    const sound = sounds.find((s) => s.id === menu.soundId);
+    if (!sound) return null;
+
+    const items: Array<{ kind?: "item"; label: string; disabled?: boolean; action: () => void } | { kind: "sep" }> = [
+      {
+        kind: "item",
+        label: sound.muted ? "ミュート解除" : "ミュート",
+        action: () => {
+          updateSound(sound.id, { muted: !sound.muted });
+          setMenu(null);
+        },
+      },
+      {
+        kind: "item",
+        label: "音量…",
+        action: () => {
+          // Use a simple dialog for volume - could be enhanced later
+          const v = window.prompt(
+            "音量 (0–100)",
+            String(Math.round(sound.volume * 100)),
+          );
+          if (v != null && v !== "") {
+            const n = Number(v);
+            if (Number.isFinite(n)) {
+              updateSound(sound.id, { volume: Math.max(0, Math.min(1, n / 100)) });
+            }
+          }
+          setMenu(null);
+        },
+      },
+      { kind: "sep" },
+      {
+        kind: "item",
+        label: "削除",
+        action: () => {
+          removeSound(sound.id);
+          setMenu(null);
+        },
+      },
+    ];
+
+    return createPortal(
+      <div
+        ref={menuRef}
+        className="yo-context-menu"
+        style={{ left: menu.x, top: menu.y }}
+        role="menu"
+        onContextMenu={(e) => e.preventDefault()}
+        onMouseDown={(e) => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {items.map((item, i) =>
+          item.kind === "sep" ? (
+            <div key={`sep-${i}`} className="yo-context-sep" />
+          ) : (
+            <button
+              key={item.label}
+              type="button"
+              role="menuitem"
+              className="yo-context-item"
+              disabled={item.disabled}
+              onClick={() => {
+                if (item.disabled) return;
+                item.action();
+                setMenu(null);
+              }}
+            >
+              <span>{item.label}</span>
+            </button>
+          )
+        )}
+      </div>,
+      document.body,
+    );
   };
 
   return (
@@ -174,64 +287,7 @@ export function AudioTrack({ zoom, duration }: Props) {
           );
         })}
       </div>
-      {menu && (
-        <div
-          className="keyframe-context-menu"
-          style={{ left: menu.x, top: menu.y }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <button
-            type="button"
-            onClick={() => {
-              const s = sounds.find((x) => x.id === menu.soundId);
-              if (s) updateSound(menu.soundId, { muted: !s.muted });
-              setMenu(null);
-            }}
-          >
-            {sounds.find((x) => x.id === menu.soundId)?.muted
-              ? "ミュート解除"
-              : "ミュート"}
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              const v = window.prompt(
-                "音量 (0–100)",
-                String(
-                  Math.round(
-                    (sounds.find((x) => x.id === menu.soundId)?.volume ?? 1) *
-                      100,
-                  ),
-                ),
-              );
-              if (v != null && v !== "") {
-                const n = Number(v);
-                if (Number.isFinite(n)) {
-                  updateSound(menu.soundId, {
-                    volume: Math.max(0, Math.min(1, n / 100)),
-                  });
-                }
-              }
-              setMenu(null);
-            }}
-          >
-            音量…
-          </button>
-          <div className="menu-divider" />
-          <button
-            type="button"
-            onClick={() => {
-              removeSound(menu.soundId);
-              setMenu(null);
-            }}
-          >
-            削除
-          </button>
-          <button type="button" onClick={() => setMenu(null)}>
-            閉じる
-          </button>
-        </div>
-      )}
+      {renderMenu()}
     </div>
   );
 }

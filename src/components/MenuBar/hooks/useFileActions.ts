@@ -1,10 +1,12 @@
 import { useState } from "react";
 import { useProjectStore } from "@/stores/projectStore";
+import type { PngExportSettings, WebmExportSettings } from "@/components/ui/ExportDialogs";
+import type { SvgImportSettings } from "@/components/ui/SvgImportDialog";
 import {
   listRecentProjects,
-  loadRecentSnapshot,
+  loadRecentSnapshotAsync,
   clearRecentProjects,
-  loadAutosave,
+  loadAutosaveAsync, projectHasMissingAssetData,
   getPersistencePrefs,
   setPersistencePrefs,
   writeAutosave,
@@ -20,6 +22,7 @@ import {
   parseSvgToShapes,
   pickFiles,
   readSvgText,
+  PROJECT_FILE_ACCEPT,
 } from "@/lib/project";
 import { exportPngSequence, exportWebmVideo } from "@/lib/export";
 
@@ -36,11 +39,22 @@ export function useFileActions() {
   const currentFrame = useProjectStore((s) => s.currentFrame);
 
   const [exportBusy, setExportBusy] = useState(false);
+  const [pngDialogOpen, setPngDialogOpen] = useState(false);
+  const [webmDialogOpen, setWebmDialogOpen] = useState(false);
+  const [svgPending, setSvgPending] = useState<{
+    file: File;
+    resolve: (s: SvgImportSettings | null) => void;
+  } | null>(null);
   const [recentTick, setRecentTick] = useState(0);
   const recentEntries = listRecentProjects();
   void recentTick;
   const refreshRecent = () => setRecentTick((n) => n + 1);
   const autosavePrefs = getPersistencePrefs();
+
+  const askSvgSettings = (file: File) =>
+    new Promise<SvgImportSettings | null>((resolve) => {
+      setSvgPending({ file, resolve });
+    });
 
   const importImages = async () => {
     const files = await pickFiles({
@@ -54,17 +68,9 @@ export function useFileActions() {
       if (!isSupportedImageFile(file)) continue;
       try {
         if (isSvgFile(file) && selectedLayerId) {
-          const choice = window.prompt(
-            `「${file.name}」の取り込み:\n  1 = 画像\n  2 = パスに変換\n  3 = 両方`,
-            "3",
-          );
-          if (choice == null) continue;
-          const mode =
-            choice.trim() === "1"
-              ? "bitmap"
-              : choice.trim() === "2"
-                ? "vector"
-                : "both";
+          const settings = await askSvgSettings(file);
+          if (!settings) continue;
+          const mode = settings.mode;
           if (mode === "bitmap" || mode === "both") {
             const assetId = addAsset(await createImageAssetFromFile(file));
             if (mode === "bitmap") {
@@ -126,109 +132,91 @@ export function useFileActions() {
     ) {
       return;
     }
-    const [file] = await pickFiles({ accept: "application/json,.json" });
+    const [file] = await pickFiles({ accept: PROJECT_FILE_ACCEPT });
     if (!file) return;
     await openProjectFile(file, setProject);
     refreshRecent();
   };
 
   const openRecentEntry = (id: string) => {
-    if (
-      isDocumentDirty() &&
-      !window.confirm("未保存の変更があります。最近使ったプロジェクトを開きますか？")
-    ) {
-      return;
-    }
-    const snap = loadRecentSnapshot(id);
-    if (!snap) {
-      window.alert(
-        "この項目のスナップショットがありません。\nファイルメニューの「開く…」から JSON を読み込んでください。",
-      );
-      return;
-    }
-    setProject(snap);
-    refreshRecent();
+    void (async () => {
+      if (
+        isDocumentDirty() &&
+        !window.confirm(
+          "未保存の変更があります。最近使ったプロジェクトを開きますか？",
+        )
+      ) {
+        return;
+      }
+      const snap = await loadRecentSnapshotAsync(id);
+      if (!snap) {
+        window.alert(
+          "この項目のスナップショットがありません。\nファイルメニューの「開く…」からプロジェクトファイル（.yoko）を読み込んでください。",
+        );
+        return;
+      }
+      setProject(snap);
+      refreshRecent();
+    })();
   };
 
   const restoreAutosave = () => {
-    if (
-      isDocumentDirty() &&
-      !window.confirm("未保存の変更があります。自動保存を復元しますか？")
-    ) {
-      return;
-    }
-    const draft = loadAutosave();
-    if (!draft?.project) {
-      window.alert("自動保存データがありません。");
-      return;
-    }
-    const when = new Date(draft.savedAt).toLocaleString();
-    if (
-      !window.confirm(
-        `自動保存（${when}）を復元しますか？\n未保存の変更は失われる場合があります。`,
-      )
-    ) {
-      return;
-    }
-    setProject(draft.project);
+    void (async () => {
+      if (
+        isDocumentDirty() &&
+        !window.confirm("未保存の変更があります。自動保存を復元しますか？")
+      ) {
+        return;
+      }
+      const draft = await loadAutosaveAsync();
+      if (!draft?.project) {
+        window.alert("自動保存データがありません。");
+        return;
+      }
+      const when = new Date(draft.savedAt).toLocaleString();
+      const missing = projectHasMissingAssetData(draft.project);
+      const warn = missing
+        ? "\n※一部の画像・音声データが含まれていません。"
+        : "";
+      if (
+        !window.confirm(
+          `自動保存（${when}）を復元しますか？\n未保存の変更は失われる場合があります。${warn}`,
+        )
+      ) {
+        return;
+      }
+      setProject(draft.project);
+    })();
   };
 
-  const runSoon = (fn: () => Promise<void>) => {
+  const runSoon = (fn: () => void | Promise<void>) => {
     void fn();
   };
 
-  const handleExportPngSequence = async () => {
+
+  const handleExportPngSequence = () => {
     if (exportBusy) return;
-    const comp = project.compositions[project.activeCompositionId];
-    if (!comp) {
-      window.alert("アクティブなコンポジションがありません。");
-      return;
-    }
-    const last = Math.max(0, comp.duration - 1);
-    const startStr = window.prompt(`開始フレーム (0〜${last})`, "0");
-    if (startStr === null) return;
-    const endStr = window.prompt(`終了フレーム (0〜${last})`, String(last));
-    if (endStr === null) return;
-    const scaleStr = window.prompt("解像度スケール (1 = 100%)", "1");
-    if (scaleStr === null) return;
-    const transparent = window.confirm(
-      "背景を透明にしますか？\n\nOK = 透明PNG\nキャンセル = ドキュメント背景色",
-    );
-    const asZip = window.confirm(
-      "ZIPにまとめてダウンロードしますか？\n\nOK = 1つのZIP\nキャンセル = PNGを個別に保存",
-    );
+    setPngDialogOpen(true);
+  };
 
-    const startFrame = Math.max(0, Math.min(last, Math.round(Number(startStr) || 0)));
-    const endFrame = Math.max(startFrame, Math.min(last, Math.round(Number(endStr) || last)));
-    const scale = Math.max(0.25, Math.min(4, Number(scaleStr) || 1));
-    const total = endFrame - startFrame + 1;
-
-    if (
-      !window.confirm(
-        `PNG 連番を書き出します。\n` +
-          `フレーム ${startFrame}〜${endFrame}（${total} 枚）\n` +
-          `サイズ ${Math.round(project.settings.width * scale)}×${Math.round(project.settings.height * scale)}\n` +
-          `背景: ${transparent ? "透明" : "ドキュメント色"}\n` +
-          `形式: ${asZip ? "ZIP" : "個別PNG"}`,
-      )
-    ) {
-      return;
-    }
-
+  const runPngExport = async (settings: PngExportSettings) => {
+    if (exportBusy) return;
     setExportBusy(true);
     try {
       const result = await exportPngSequence({
         project,
-        startFrame,
-        endFrame,
-        scale,
-        transparent,
-        asZip,
-        onProgress: (current, totalCount, fileName) => {
-          document.title = `書き出し中 ${current}/${totalCount} — ${fileName}`;
+        startFrame: settings.startFrame,
+        endFrame: settings.endFrame,
+        scale: settings.scale,
+        transparent: settings.transparent,
+        asZip: settings.asZip,
+        filePrefix: settings.filePrefix,
+        onProgress: (current, total, fileName) => {
+          document.title = `PNG ${current}/${total} ${fileName}`;
         },
       });
       document.title = "YOKOZUNA";
+      setPngDialogOpen(false);
       if (result.cancelled) {
         window.alert(`書き出しを中断しました（${result.exported} 枚まで完了）`);
       } else if (result.mode === "zip") {
@@ -241,7 +229,7 @@ export function useFileActions() {
     } catch (error) {
       console.error(error);
       window.alert(
-        `書き出しに失敗しました: ${error instanceof Error ? error.message : String(error)}`,
+        `PNG 書き出しに失敗しました: ${error instanceof Error ? error.message : String(error)}`,
       );
     } finally {
       setExportBusy(false);
@@ -249,57 +237,28 @@ export function useFileActions() {
     }
   };
 
-  const handleExportWebm = async () => {
+  const handleExportWebm = () => {
     if (exportBusy) return;
-    const comp = project.compositions[project.activeCompositionId];
-    if (!comp) {
-      window.alert("アクティブなコンポジションがありません。");
-      return;
-    }
-    const last = Math.max(0, comp.duration - 1);
-    const fpsDefault = project.settings.fps || 24;
+    setWebmDialogOpen(true);
+  };
 
-    const startStr = window.prompt(`開始フレーム (0〜${last})`, "0");
-    if (startStr === null) return;
-    const endStr = window.prompt(`終了フレーム (0〜${last})`, String(last));
-    if (endStr === null) return;
-    const fpsStr = window.prompt(`フレームレート (fps)`, String(fpsDefault));
-    if (fpsStr === null) return;
-    const scaleStr = window.prompt("解像度スケール (1 = 100%)", "1");
-    if (scaleStr === null) return;
-
-    const startFrame = Math.max(0, Math.min(last, Math.round(Number(startStr) || 0)));
-    const endFrame = Math.max(startFrame, Math.min(last, Math.round(Number(endStr) || last)));
-    const fps = Math.max(1, Math.min(60, Number(fpsStr) || fpsDefault));
-    const scale = Math.max(0.25, Math.min(4, Number(scaleStr) || 1));
-    const total = endFrame - startFrame + 1;
-    const sec = (total / fps).toFixed(2);
-
-    if (
-      !window.confirm(
-        `WebM 動画を書き出します。\n` +
-          `フレーム ${startFrame}〜${endFrame}（${total} 枚）\n` +
-          `${Math.round(project.settings.width * scale)}×${Math.round(project.settings.height * scale)} @ ${fps} fps\n` +
-          `約 ${sec} 秒\n\n` +
-          `※ 背景はドキュメント色です（動画の透明はブラウザ依存のため非対応）`,
-      )
-    ) {
-      return;
-    }
-
+  const runWebmExport = async (settings: WebmExportSettings) => {
+    if (exportBusy) return;
     setExportBusy(true);
     try {
       const result = await exportWebmVideo({
         project,
-        startFrame,
-        endFrame,
-        fps,
-        scale,
+        startFrame: settings.startFrame,
+        endFrame: settings.endFrame,
+        fps: settings.fps,
+        scale: settings.scale,
+        filePrefix: settings.fileName.replace(/\.webm$/i, ""),
         onProgress: (current, totalCount) => {
           document.title = `動画書き出し ${current}/${totalCount}`;
         },
       });
       document.title = "YOKOZUNA";
+      setWebmDialogOpen(false);
       if (result.cancelled) {
         window.alert(`書き出しを中断しました（${result.exported} フレームまで）\n${result.fileName}`);
       } else {
@@ -319,6 +278,19 @@ export function useFileActions() {
   return {
     project,
     exportBusy,
+    pngDialogOpen,
+    setPngDialogOpen,
+    webmDialogOpen,
+    setWebmDialogOpen,
+    runPngExport,
+    runWebmExport,
+    svgPending,
+    resolveSvgPending: (settings: SvgImportSettings | null) => {
+      if (svgPending) {
+        svgPending.resolve(settings);
+        setSvgPending(null);
+      }
+    },
     recentEntries,
     autosavePrefs,
     refreshRecent,
@@ -327,8 +299,8 @@ export function useFileActions() {
     openProject: () => runSoon(openProject),
     openRecentEntry,
     restoreAutosave,
-    runExportPng: () => runSoon(handleExportPngSequence),
-    runExportWebm: () => runSoon(handleExportWebm),
+    runExportPng: () => runSoon(() => handleExportPngSequence()),
+    runExportWebm: () => runSoon(() => handleExportWebm()),
     flushAutosaveNow: () => {
       const ok = writeAutosave(project);
       window.alert(ok ? "自動保存しました。" : "自動保存に失敗しました（容量不足の可能性）。");

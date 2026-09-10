@@ -109,6 +109,12 @@ export function createFreehandShape(
   const centerY =
     simplified.reduce((sum, point) => sum + point.y, 0) / simplified.length;
 
+  const first = simplified[0]!;
+  const last = simplified[simplified.length - 1]!;
+  const autoClose =
+    simplified.length >= 3 &&
+    Math.hypot(first.x - last.x, first.y - last.y) <= 12;
+
   return {
     id: generateId("shape"),
     type: "shape",
@@ -127,6 +133,7 @@ export function createFreehandShape(
     stroke: options?.stroke ?? "#f8fafc",
     strokeWidth: options?.strokeWidth ?? 4,
     ...options,
+    closePath: options?.closePath ?? autoClose,
   };
 }
 

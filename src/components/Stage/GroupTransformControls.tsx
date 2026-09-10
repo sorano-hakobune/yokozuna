@@ -48,6 +48,10 @@ export function GroupTransformControls({
 
   const rotateY = y - ROTATE_OFFSET * invZoom;
 
+  // Group pivot (基準点): multi-select rotation/scale center (union center).
+  const pivotR = hs * 0.55;
+  const pivotArm = hs * 1.1;
+
   return (
     <g className="group-transform-controls" pointerEvents="none">
       <rect
@@ -112,6 +116,54 @@ export function GroupTransformControls({
           vectorEffect="non-scaling-stroke"
         />
       ))}
+      {/* Group pivot (基準点) marker — display only */}
+      <line
+        x1={cx - pivotArm}
+        y1={cy}
+        x2={cx + pivotArm}
+        y2={cy}
+        stroke={SEL_OUTER}
+        strokeWidth={outerW}
+        vectorEffect="non-scaling-stroke"
+        opacity={0.95}
+      />
+      <line
+        x1={cx}
+        y1={cy - pivotArm}
+        x2={cx}
+        y2={cy + pivotArm}
+        stroke={SEL_OUTER}
+        strokeWidth={outerW}
+        vectorEffect="non-scaling-stroke"
+        opacity={0.95}
+      />
+      <line
+        x1={cx - pivotArm}
+        y1={cy}
+        x2={cx + pivotArm}
+        y2={cy}
+        stroke={SEL_STROKE}
+        strokeWidth={strokeW}
+        vectorEffect="non-scaling-stroke"
+      />
+      <line
+        x1={cx}
+        y1={cy - pivotArm}
+        x2={cx}
+        y2={cy + pivotArm}
+        stroke={SEL_STROKE}
+        strokeWidth={strokeW}
+        vectorEffect="non-scaling-stroke"
+      />
+      <circle
+        cx={cx}
+        cy={cy}
+        r={pivotR}
+        fill={SEL_OUTER}
+        stroke={SEL_STROKE}
+        strokeWidth={strokeW}
+        vectorEffect="non-scaling-stroke"
+      />
       {count > 1 && (
         <text
           x={x + w + 6 * invZoom}

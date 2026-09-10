@@ -1,9 +1,37 @@
+import { useEffect, useState } from "react";
 import type { InspectorModel } from "../hooks/useInspectorModel";
+import { getSystemFonts } from "../../../lib/systemFonts";
 
 export function TextFields({ m }: { m: InspectorModel }) {
   const el = m.selectedElement;
   if (el?.type !== "shape" || el.shapeType !== "text") return null;
   const on = m.handleElementPropertyChange;
+
+  const [fonts, setFonts] = useState<string[]>(() => [
+    "sans-serif",
+    "serif",
+    "monospace",
+    "Yu Gothic",
+    "Yu Mincho",
+    "Hiragino Sans",
+    "Noto Sans JP",
+    "Meiryo",
+  ]);
+
+  useEffect(() => {
+    let cancelled = false;
+    getSystemFonts().then((list) => {
+      if (!cancelled && list.length > 0) setFonts(list);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const current = el.fontFamily ?? "sans-serif";
+  // Ensure the current value is always present in the datalist even if not in system list
+  const options = fonts.includes(current) ? fonts : [current, ...fonts];
+
   return (
     <>
       <label className="prop-field">
@@ -26,16 +54,20 @@ export function TextFields({ m }: { m: InspectorModel }) {
       </label>
       <label className="prop-field">
         <span>フォント</span>
-        <select
-          value={el.fontFamily ?? "sans-serif"}
+        <input
+          type="text"
+          list="yoko-system-fonts"
+          value={current}
           onChange={(e) => on("fontFamily", e.target.value)}
-        >
-          <option value="sans-serif">Sans</option>
-          <option value="serif">Serif</option>
-          <option value="monospace">Mono</option>
-          <option value="Yu Gothic, sans-serif">游ゴシック</option>
-          <option value="Yu Mincho, serif">游明朝</option>
-        </select>
+          placeholder="フォント名"
+          spellCheck={false}
+          autoComplete="off"
+        />
+        <datalist id="yoko-system-fonts">
+          {options.map((f) => (
+            <option key={f} value={f} />
+          ))}
+        </datalist>
       </label>
       <label className="prop-field">
         <span>サイズ</span>

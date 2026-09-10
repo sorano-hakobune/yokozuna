@@ -14,6 +14,8 @@ export type TransformSession = {
   initialScaleY: number;
   /** Angle offset so rotation feels continuous from grab point */
   rotationGrabOffset: number;
+  /** Pivot at drag start (local space); used by pivot handle */
+  initialPivot?: { x: number; y: number };
   /** Multi-select transform: all selected items' starting state */
   multiItems?: Array<{
     layerId: string;

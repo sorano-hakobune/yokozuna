@@ -7,7 +7,16 @@ import { Inspector } from "@/components/Inspector";
 import { ColorPanel } from "@/components/Panels/ColorPanel";
 import { LibraryPanel } from "@/components/Panels/LibraryPanel";
 import { useProjectStore } from "@/stores/projectStore";
-import { loadAutosave, projectFingerprint } from "@/lib/project/persistence";
+import {
+  loadAutosaveAsync,
+  projectFingerprint,
+  projectHasMissingAssetData,
+} from "@/lib/project/persistence";
+import {
+  migrateProjectData,
+  projectSchema,
+} from "@/lib/project/projectSchema";
+import type { Project } from "@/types/project";
 import { useAutosave } from "@/hooks/useAutosave";
 import { useActiveLayers } from "@/stores/projectSelectors";
 import { useEditorShortcuts } from "@/hooks/useEditorShortcuts";
@@ -24,8 +33,15 @@ const ONBOARDING_KEY = "yokozuna-onboarding-dismissed";
 
 export function Editor() {
   const activeLayers = useActiveLayers();
-  const [timelineHeight, setTimelineHeight] = useState(
-    Math.max(160, 100 + activeLayers.length * 24),
+  const clampTimelineHeight = (h: number) => {
+    // Keep enough room for the stage in short windows (e.g. 800×600).
+    const vh = typeof window !== "undefined" ? window.innerHeight : 800;
+    const maxByViewport = Math.max(120, Math.floor(vh * 0.34));
+    return Math.max(120, Math.min(h, maxByViewport, 420));
+  };
+
+  const [timelineHeight, setTimelineHeight] = useState(() =>
+    clampTimelineHeight(Math.max(160, 100 + activeLayers.length * 24)),
   );
   const [rightDockOpen, setRightDockOpen] = useState(true);
   const [rightTab, setRightTab] = useState<RightTab>("properties");
@@ -43,21 +59,39 @@ export function Editor() {
   useEditorShortcuts();
   useAutosave();
 
-  // Offer to restore autosave draft once on launch
+  // Offer to restore autosave draft once on launch (IndexedDB-aware)
   useEffect(() => {
-    const draft = loadAutosave();
-    if (!draft?.project) return;
-    const current = useProjectStore.getState().project;
-    // Skip if same fingerprint (already restored / empty match)
-    if (projectFingerprint(draft.project) === projectFingerprint(current)) return;
-    const when = new Date(draft.savedAt).toLocaleString();
-    const name = draft.project.meta.name || "無題";
-    const ok = window.confirm(
-      `自動保存されたプロジェクトがあります。\n「${name}」\n保存日時: ${when}\n\n復元しますか？`,
-    );
-    if (ok) {
-      useProjectStore.getState().setProject(draft.project);
-    }
+    let cancelled = false;
+    void (async () => {
+      const draft = await loadAutosaveAsync();
+      if (cancelled || !draft?.project) return;
+      const parsed = projectSchema.safeParse(migrateProjectData(draft.project));
+      if (!parsed.success) {
+        console.warn(
+          "自動保存データが破損しているため復元をスキップしました",
+          parsed.error.issues.length,
+        );
+        return;
+      }
+      const restored = parsed.data as Project;
+      const current = useProjectStore.getState().project;
+      if (projectFingerprint(restored) === projectFingerprint(current)) return;
+      const when = new Date(draft.savedAt).toLocaleString();
+      const name = restored.meta.name || "無題";
+      const missing = projectHasMissingAssetData(restored);
+      const warn = missing
+        ? "\n\n※一部の画像・音声データが含まれていません。"
+        : "";
+      const ok = window.confirm(
+        `自動保存されたプロジェクトがあります。\n「${name}」\n保存日時: ${when}${warn}\n\n復元しますか？`,
+      );
+      if (ok && !cancelled) {
+        useProjectStore.getState().setProject(restored);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -80,33 +114,30 @@ export function Editor() {
     }
   }, []);
 
+  // Grow slightly with layer count, but never steal stage space on short windows.
   useEffect(() => {
     setTimelineHeight((height) =>
-      Math.max(
-        height,
-        Math.min(window.innerHeight * 0.5, 100 + activeLayers.length * 24),
+      clampTimelineHeight(
+        Math.max(height, 100 + activeLayers.length * 24),
       ),
     );
   }, [activeLayers.length]);
 
+  // Re-clamp when the window is resized (e.g. user shrinks to 800×600).
   useEffect(() => {
-    const mq = window.matchMedia("(max-width: 860px)");
-    const apply = () => {
-      if (mq.matches) setTimelineHeight(140);
+    const onResize = () => {
+      setTimelineHeight((h) => clampTimelineHeight(h));
     };
-    apply();
-    mq.addEventListener("change", apply);
-    return () => mq.removeEventListener("change", apply);
+    window.addEventListener("resize", onResize);
+    onResize();
+    return () => window.removeEventListener("resize", onResize);
   }, []);
 
   // Timeline at bottom: drag top edge — height = window bottom - clientY
   useEffect(() => {
     const onMove = (e: MouseEvent) => {
       if (resizing.current === "timeline") {
-        const next = Math.max(
-          120,
-          Math.min(window.innerHeight * 0.55, window.innerHeight - e.clientY),
-        );
+        const next = clampTimelineHeight(window.innerHeight - e.clientY);
         setTimelineHeight(next);
       }
     };

@@ -232,6 +232,9 @@ export function TweenSection({ m }: { m: InspectorModel }) {
                       selectedElement.rotation ?? 0,
                       selectedElement.scaleX ?? 1,
                       selectedElement.scaleY ?? 1,
+                      selectedElement.pivot
+                        ? { x: selectedElement.pivot.x, y: selectedElement.pivot.y }
+                        : undefined,
                     ),
                   );
                   if (currentKeyframe.tween !== "motion") {

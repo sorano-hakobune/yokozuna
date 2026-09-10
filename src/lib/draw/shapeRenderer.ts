@@ -14,6 +14,8 @@ export function drawShape(
   ctx.translate(shape.x, shape.y);
   ctx.rotate((shape.rotation ?? 0) * (Math.PI / 180));
   ctx.scale(shape.scaleX ?? 1, shape.scaleY ?? 1);
+  // Pivot model: W(L) = T + R*S*(L - P)
+  ctx.translate(-(shape.pivot?.x ?? 0), -(shape.pivot?.y ?? 0));
   ctx.globalAlpha = shape.opacity ?? 1;
 
   const hasGrad = applyCanvasGradientFill(ctx, shape);
@@ -59,8 +61,15 @@ function drawRectangle(
     Math.min(shape.cornerRadius ?? 0, Math.min(width, height) / 2),
   );
   ctx.beginPath();
-  if (rr > 0 && typeof (ctx as CanvasRenderingContext2D & { roundRect?: Function }).roundRect === "function") {
-    (ctx as CanvasRenderingContext2D & { roundRect: Function }).roundRect(
+  type RoundRectFn = (
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    radii?: number | DOMPointInit | (number | DOMPointInit)[],
+  ) => void;
+  if (rr > 0 && typeof (ctx as CanvasRenderingContext2D & { roundRect?: RoundRectFn }).roundRect === "function") {
+    (ctx as CanvasRenderingContext2D & { roundRect: RoundRectFn }).roundRect(
       x,
       y,
       width,

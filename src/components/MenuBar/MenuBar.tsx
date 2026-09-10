@@ -13,6 +13,9 @@ import { buildViewItems } from "./menus/buildViewItems";
 import { buildAnimationItems } from "./menus/buildAnimationItems";
 import { buildLayerItems } from "./menus/buildLayerItems";
 import { buildObjectItems } from "./menus/buildObjectItems";
+import { SvgImportDialog } from "@/components/ui/SvgImportDialog";
+import { PngExportDialog, WebmExportDialog } from "@/components/ui/ExportDialogs";
+import { SymbolDialog } from "@/components/ui/SymbolDialog";
 
 const EMPTY_LABELS: FrameLabel[] = [];
 const EMPTY_LAYERS: Layer[] = [];
@@ -56,6 +59,10 @@ export function MenuBar() {
   const futureLength = useProjectStore((s) => s.future.length);
   const convertSelectionToSymbol = useProjectStore((s) => s.convertSelectionToSymbol);
   const createSymbol = useProjectStore((s) => s.createSymbol);
+  const [symbolDialog, setSymbolDialog] = useState<{
+    mode: "create" | "convert";
+    defaultName: string;
+  } | null>(null);
   const addInstanceElement = useProjectStore((s) => s.addInstanceElement);
   const updateLayer = useProjectStore((s) => s.updateLayer);
   const reorderLayers = useProjectStore((s) => s.reorderLayers);
@@ -105,30 +112,36 @@ export function MenuBar() {
       window.alert("ステージ上のオブジェクトを選択してください。");
       return;
     }
-    const name = window.prompt("シンボル名", "Symbol 1");
-    if (!name) return;
-    const typeInput = window.prompt("種類: graphic または movieClip", "graphic");
-    const symbolType = typeInput === "movieClip" ? "movieClip" : "graphic";
-    queueMicrotask(() => {
-      convertSelectionToSymbol(name, symbolType);
-    });
+    setSymbolDialog({ mode: "convert", defaultName: "Symbol 1" });
   };
 
   const promptNewSymbol = () => {
-    const name = window.prompt("シンボル名", "Symbol 1");
-    if (!name) return;
-    const typeInput = window.prompt("種類: graphic または movieClip", "graphic");
-    const symbolType = typeInput === "movieClip" ? "movieClip" : "graphic";
-    const layerId = selectedLayerId;
-    const frame = currentFrame;
-    const cx = settings.width / 2;
-    const cy = settings.height / 2;
-    queueMicrotask(() => {
-      const id = createSymbol(name, symbolType);
-      if (layerId) {
-        addInstanceElement(layerId, frame, id, cx, cy);
-      }
-    });
+    setSymbolDialog({ mode: "create", defaultName: "Symbol 1" });
+  };
+
+  const handleSymbolDialogConfirm = (cfg: {
+    name: string;
+    symbolType: "graphic" | "movieClip";
+  }) => {
+    const dlg = symbolDialog;
+    setSymbolDialog(null);
+    if (!dlg) return;
+    if (dlg.mode === "convert") {
+      queueMicrotask(() => {
+        convertSelectionToSymbol(cfg.name, cfg.symbolType);
+      });
+    } else {
+      const layerId = selectedLayerId;
+      const frame = currentFrame;
+      const cx = settings.width / 2;
+      const cy = settings.height / 2;
+      queueMicrotask(() => {
+        const id = createSymbol(cfg.name, cfg.symbolType);
+        if (layerId) {
+          addInstanceElement(layerId, frame, id, cx, cy);
+        }
+      });
+    }
   };
 
   const renameSelectedLayer = () => {
@@ -144,8 +157,9 @@ export function MenuBar() {
   };
 
   const recentMenuItems: MenuItemEntry[] = file.recentEntries.slice(0, 8).map((entry) => ({
-    label: entry.hasSnapshot ? `最近: ${entry.name}` : `最近: ${entry.name}（再読込不可）`,
-    disabled: !entry.hasSnapshot,
+    // Snapshots may live in IndexedDB even when localStorage flagged hasSnapshot=false (legacy).
+    label: `最近: ${entry.name}`,
+    disabled: false,
     onClick: () => file.openRecentEntry(entry.id),
   }));
 
@@ -169,9 +183,16 @@ export function MenuBar() {
       label: "保存",
       kicker: "Ctrl+S",
       onClick: () => {
-        downloadProjectJson(project);
-        markProjectSaved();
-        file.refreshRecent();
+        void downloadProjectJson(project).then((result) => {
+          if (result.status === "cancelled") return;
+          // Reflect the name chosen in the save dialog
+          const chosen = result.fileName.replace(/\.[^.]+$/, "");
+          if (chosen && chosen !== project.meta.name) {
+            updateMeta({ name: chosen });
+          }
+          markProjectSaved();
+          file.refreshRecent();
+        });
       },
     },
     { label: "自動保存を今すぐ実行", onClick: file.flushAutosaveNow },
@@ -335,6 +356,36 @@ export function MenuBar() {
         </span>
       </div>
       {showShortcuts && <ShortcutsDialog onClose={() => setShowShortcuts(false)} />}
+      <SymbolDialog
+        open={symbolDialog != null}
+        mode={symbolDialog?.mode ?? "create"}
+        defaultName={symbolDialog?.defaultName ?? "Symbol 1"}
+        onClose={() => setSymbolDialog(null)}
+        onConfirm={handleSymbolDialogConfirm}
+      />
+      <PngExportDialog
+        open={file.pngDialogOpen}
+        lastFrame={Math.max(0, (project.compositions[project.activeCompositionId]?.duration ?? project.settings.duration) - 1)}
+        defaultPrefix={project.meta.name || "frame"}
+        onClose={() => file.setPngDialogOpen(false)}
+        onExport={file.runPngExport}
+        busy={file.exportBusy}
+      />
+      <WebmExportDialog
+        open={file.webmDialogOpen}
+        lastFrame={Math.max(0, (project.compositions[project.activeCompositionId]?.duration ?? project.settings.duration) - 1)}
+        defaultFps={project.settings.fps}
+        defaultName={(project.meta.name || "export") + ".webm"}
+        onClose={() => file.setWebmDialogOpen(false)}
+        onExport={file.runWebmExport}
+        busy={file.exportBusy}
+      />
+      <SvgImportDialog
+        open={file.svgPending != null}
+        fileName={file.svgPending?.file.name ?? ""}
+        onClose={() => file.resolveSvgPending(null)}
+        onImport={(s) => file.resolveSvgPending(s)}
+      />
     </header>
   );
 }

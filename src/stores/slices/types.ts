@@ -79,6 +79,8 @@ export interface ClipboardSlice {
     elements: Element[];
     tween: TweenType;
     easing?: EasingType;
+    easingBezier?: Keyframe["easingBezier"];
+    motionPath?: Keyframe["motionPath"];
   } | null;
   /** Successive paste offset counter (reset on copy). */
   _clipboardPasteGen: number;

@@ -3,6 +3,7 @@ import { useProjectStore } from "@/stores/projectStore";
 import { getElementsAtFrame } from "@/lib/animation/interpolate";
 import { hitTestTopElement } from "@/lib/stage/hitTest";
 import { getCanvasCoordinates as getCanvasPoint } from "../stageGeometry";
+import { getLocalBounds, reanchorPivot } from "../transformGeometry";
 import type { StageContextMenuState } from "../StageContextMenu";
 
 /**
@@ -26,8 +27,9 @@ export function useStageContextMenu(
     e.stopPropagation();
     const state = useProjectStore.getState();
     const proj = state.project;
-    const layers =
-      proj.compositions[proj.activeCompositionId]?.layers ?? [];
+    const layers = state.editingSymbolId
+      ? (proj.symbols[state.editingSymbolId]?.layers ?? [])
+      : (proj.compositions[proj.activeCompositionId]?.layers ?? []);
     const coords = getCanvasPoint(
       svgRef.current,
       e.clientX,
@@ -82,5 +84,66 @@ export function useStageContextMenu(
     setSelectedElementIds([]);
   }, [beginHistoryBatch, endHistoryBatch, removeElement, setSelectedElementIds]);
 
-  return { contextMenu, setContextMenu, handleContextMenu, handleDeleteSelection };
+  /**
+   * Move the transform origin (基準点) back to the visual geometry center
+   * (single selection only). Geometry stays fixed via reanchor compensation.
+   * Works uniformly for every object type (no per-type handling).
+   */
+  const handleResetPivot = useCallback(() => {
+    const state = useProjectStore.getState();
+    const ids =
+      state.selectedElementIds.length > 0
+        ? [...state.selectedElementIds]
+        : state.selectedElementId
+          ? [state.selectedElementId]
+          : [];
+    if (ids.length !== 1) return;
+    const targetId = ids[0]!;
+    const targetLayers = state.editingSymbolId
+      ? (state.project.symbols[state.editingSymbolId]?.layers ?? [])
+      : (state.project.compositions[state.project.activeCompositionId]?.layers ??
+        []);
+    for (const layer of targetLayers) {
+      if (layer.locked) continue;
+      const el = getElementsAtFrame(layer.keyframes, state.currentFrame).find(
+        (x) => x.id === targetId,
+      );
+      if (!el) continue;
+      const asset =
+        el.type === "bitmap"
+          ? state.project.assets[el.assetId]
+          : el.type === "instance"
+            ? state.project.symbols[el.symbolId]
+            : undefined;
+      const bounds = getLocalBounds(el, asset);
+      const next = reanchorPivot(el, { x: bounds.cx, y: bounds.cy });
+      // No-op when already centered
+      const cur = el.pivot ?? { x: 0, y: 0 };
+      if (
+        Math.abs(cur.x - next.pivot.x) < 1e-9 &&
+        Math.abs(cur.y - next.pivot.y) < 1e-9
+      ) {
+        return;
+      }
+      beginHistoryBatch();
+      try {
+        state.updateElement(layer.id, state.currentFrame, el.id, {
+          x: next.x,
+          y: next.y,
+          pivot: next.pivot,
+        });
+      } finally {
+        endHistoryBatch();
+      }
+      return;
+    }
+  }, [beginHistoryBatch, endHistoryBatch]);
+
+  return {
+    contextMenu,
+    setContextMenu,
+    handleContextMenu,
+    handleDeleteSelection,
+    handleResetPivot,
+  };
 }

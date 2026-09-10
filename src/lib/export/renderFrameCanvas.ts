@@ -50,12 +50,17 @@ function applyElementTransform(
   ctx: CanvasRenderingContext2D,
   el: Pick<
     Element,
-    "x" | "y" | "rotation" | "scaleX" | "scaleY" | "opacity" | "filters"
+    "x" | "y" | "rotation" | "scaleX" | "scaleY" | "opacity" | "filters" | "pivot"
   >,
 ) {
   ctx.translate(el.x, el.y);
   ctx.rotate(((el.rotation ?? 0) * Math.PI) / 180);
   ctx.scale(el.scaleX || 1, el.scaleY || 1);
+  const px = el.pivot?.x ?? 0;
+  const py = el.pivot?.y ?? 0;
+  if (px !== 0 || py !== 0) {
+    ctx.translate(-px, -py);
+  }
   ctx.globalAlpha *= el.opacity ?? 1;
   if (el.filters?.length) {
     const css = filtersToCss(el.filters);

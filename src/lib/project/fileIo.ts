@@ -1,22 +1,70 @@
 import { pushRecentProject } from "./persistence";
 import type { Project } from "@/types/project";
-import { downloadBlob, sanitizeFileName } from "@/lib/file-utils";
+import {
+  saveBlobAs,
+  sanitizeFileName,
+  pathFileName,
+  stripExtension,
+} from "@/lib/file-utils";
+import type { SaveBlobResult } from "@/lib/file-utils";
 import { migrateProjectData, projectSchema } from "./projectSchema";
 
 export { migrateProjectData, projectSchema } from "./projectSchema";
 
-export function downloadProjectJson(project: Project) {
-  const base = sanitizeFileName(project.meta.name || "project");
-  const blob = new Blob([JSON.stringify(project, null, 2)], {
-    type: "application/json",
-  });
-  downloadBlob(blob, `${base}.json`);
-  try {
-    pushRecentProject(project, project.meta.name || base);
-  } catch {
-    /* ignore */
-  }
+/** Official YOKOZUNA project file extension (v0.1: JSON payload inside). */
+export const PROJECT_FILE_EXT = ".yoko";
+
+/**
+ * File picker accept list: official .yoko first, legacy .json for import.
+ * MIME is advisory; browsers mainly use the extension list.
+ */
+export const PROJECT_FILE_ACCEPT =
+  ".yoko,application/x-yokozuna-project+json,application/json,.json";
+
+const PROJECT_FILE_EXT_RE = /\.(yoko|json)$/i;
+
+/** Strip known project extensions from a file name for display / recent list. */
+export function projectBaseName(fileName: string): string {
+  return fileName.replace(PROJECT_FILE_EXT_RE, "");
 }
+
+/**
+ * Save the current project as a .yoko file.
+ * v0.1 payload is the same JSON as before (full Project object).
+ * Kept export name `downloadProjectJson` for call-site compatibility.
+ */
+/**
+ * Save the current project as a .yoko file (location picker when available).
+ * Returns save result so callers can skip mark-saved on cancel.
+ */
+export async function downloadProjectJson(
+  project: Project,
+): Promise<SaveBlobResult> {
+  const base = sanitizeFileName(project.meta.name || "project");
+  const fileName = `${base}${PROJECT_FILE_EXT}`;
+  const blob = new Blob([JSON.stringify(project, null, 2)], {
+    type: "application/x-yokozuna-project+json",
+  });
+  const result = await saveBlobAs(blob, {
+    fileName,
+    extensions: ["yoko"],
+    description: "YOKOZUNA Project",
+    mimeTypes: ["application/x-yokozuna-project+json", "application/json"],
+  });
+  if (result.status !== "cancelled") {
+    try {
+      // Prefer the name the user actually chose in the dialog
+      const chosen = stripExtension(pathFileName(result.fileName || fileName));
+      pushRecentProject(project, chosen || project.meta.name || base);
+    } catch {
+      /* ignore */
+    }
+  }
+  return result;
+}
+
+/** Alias — preferred name going forward. */
+export const downloadProject = downloadProjectJson;
 
 export function pickFiles(options: {
   accept: string;
@@ -56,7 +104,9 @@ export async function parseProjectFile(file: File): Promise<Project> {
   try {
     json = JSON.parse(text);
   } catch {
-    throw new Error(`無効なプロジェクトファイルです: ${file.name} (JSON解析失敗)`);
+    throw new Error(
+      `無効なプロジェクトファイルです: ${file.name} (解析失敗)`,
+    );
   }
   const result = projectSchema.safeParse(migrateProjectData(json));
   if (!result.success) {
@@ -74,7 +124,7 @@ export async function openProjectFile(
   const project = await parseProjectFile(file);
   onProjectLoaded(project);
   try {
-    const base = file.name.replace(/\.json$/i, "");
+    const base = projectBaseName(file.name);
     pushRecentProject(project, project.meta.name || base);
   } catch {
     /* ignore */

@@ -66,13 +66,25 @@ export function elementWorldAABB(
 
 export function localBoundsToWorldAABB(
   bounds: LocalBounds,
-  t: { x: number; y: number; rotation: number; scaleX: number; scaleY: number },
+  t: {
+    x: number;
+    y: number;
+    rotation: number;
+    scaleX: number;
+    scaleY: number;
+    pivotX?: number;
+    pivotY?: number;
+  },
 ): AxisAlignedBounds {
+  const minLX = bounds.cx - bounds.halfW;
+  const maxLX = bounds.cx + bounds.halfW;
+  const minLY = bounds.cy - bounds.halfH;
+  const maxLY = bounds.cy + bounds.halfH;
   const corners = [
-    { x: -bounds.halfW, y: -bounds.halfH },
-    { x: bounds.halfW, y: -bounds.halfH },
-    { x: bounds.halfW, y: bounds.halfH },
-    { x: -bounds.halfW, y: bounds.halfH },
+    { x: minLX, y: minLY },
+    { x: maxLX, y: minLY },
+    { x: maxLX, y: maxLY },
+    { x: minLX, y: maxLY },
   ].map((p) => localToWorld(p, t));
 
   let minX = Infinity;

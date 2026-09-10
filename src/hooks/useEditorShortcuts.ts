@@ -195,13 +195,27 @@ export function useEditorShortcuts() {
       }
       if (hasModifier && key === "s") {
         event.preventDefault();
-        downloadProjectJson(useProjectStore.getState().project);
-        useProjectStore.getState().markProjectSaved();
+        downloadProjectJson(useProjectStore.getState().project).then(
+          (result) => {
+            if (result.status === "cancelled") return;
+            const chosen = result.fileName.replace(/\.[^.]+$/, "");
+            const state = useProjectStore.getState();
+            if (chosen && chosen !== state.project.meta.name) {
+              state.updateMeta({ name: chosen });
+            }
+            state.markProjectSaved();
+          },
+          (error) => {
+            console.error("プロジェクトの保存に失敗しました", error);
+          },
+        );
         return;
       }
       if (hasModifier && key === "o") {
         event.preventDefault();
-        void openProject();
+        openProject().catch((error) => {
+          console.error("プロジェクトを開けませんでした", error);
+        });
         return;
       }
       // Undo: Ctrl/Cmd+Z  /  Redo: Ctrl/Cmd+Shift+Z or Ctrl/Cmd+Y

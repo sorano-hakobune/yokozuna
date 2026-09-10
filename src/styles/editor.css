@@ -227,46 +227,7 @@ button {
   text-overflow: ellipsis;
 }
 
-/* ——— Tool strip (Toolbar.tsx, sits below the menu bar) ——— */
-.flash-toolbar {
-  flex: 0 0 auto;
-  display: flex;
-  flex-direction: row;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px 6px;
-  padding: 4px 10px;
-  background: var(--yo-raised);
-  border-bottom: 1px solid var(--yo-line);
-  box-shadow: inset 0 -1px #42535b;
-  min-width: 0;
-  user-select: none;
-}
-
-.flash-toolbar .brand-lockup {
-  flex: 0 0 auto;
-  height: auto;
-}
-
-.flash-toolbar .flash-menu {
-  flex: 0 0 auto;
-  height: auto;
-}
-
-.flash-toolbar .flash-menu .menu-item {
-  height: 24px;
-}
-
-.flash-toolbar .menu-divider {
-  flex: 0 0 1px;
-  align-self: stretch;
-  width: 1px;
-  background: #3b4a51;
-  display: inline-block;
-  min-height: 14px;
-  margin: 0 2px;
-}
-
+/* ——— Tool strip (sits below the menu bar) ——— */
 .tool-strip {
   flex: 1 1 auto;
   min-width: 0;
@@ -321,12 +282,6 @@ button {
   background: #3b4a51;
 }
 
-@media (max-width: 1100px) {
-  .flash-toolbar .brand-lockup {
-    display: none;
-  }
-}
-
 /* ——— Vertical body ——— */
 .editor-body {
   min-height: 0;
@@ -346,18 +301,8 @@ button {
 }
 
 .resize-row:hover,
-.resize-row[data-resize-handle-active],
-.resize-col:hover,
-.resize-col[data-resize-handle-active] {
+.resize-row[data-resize-handle-active] {
   background: var(--yo-accent-2);
-}
-
-.resize-col {
-  flex: 0 0 5px;
-  cursor: ew-resize;
-  background: #172126;
-  border-left: 1px solid #4b606a;
-  border-right: 1px solid var(--yo-line);
 }
 
 .workspace-row {
@@ -377,7 +322,8 @@ button {
 
 .workspace-main {
   min-width: 0;
-  flex: 1;
+  min-height: 0;
+  flex: 1 1 auto;
   display: flex;
   overflow: hidden;
 }
@@ -738,6 +684,7 @@ button {
   font-size: 18px;
   line-height: 1;
   cursor: pointer;
+  align-self: stretch;
 }
 
 .right-dock-toggle:hover {
@@ -1273,10 +1220,6 @@ button {
   font-weight: 400;
 }
 
-.inspector-shell {
-  display: none;
-}
-
 .prop-body {
   flex: 1;
   display: flex;
@@ -1491,11 +1434,6 @@ button {
   background: linear-gradient(#3d6a8a, #2a4c64);
 }
 
-.flash-playback button.is-playing {
-  background: linear-gradient(#c94c30, #8a3420);
-  border-color: var(--yo-accent-2);
-}
-
 .play-group,
 .info-group {
   display: flex;
@@ -1584,7 +1522,13 @@ button {
   flex-direction: column;
 }
 
-@media (max-width: 860px) {
+/* ——— Responsive layout ———
+ * 800×600 など狭いウィンドウでもステージを優先して確保する。
+ * 860px までは横並び（ツール | ステージ | 右ドック）を維持し、
+ * 右ドックを下へ積み上げてステージを潰さない。
+ */
+
+@media (max-width: 900px) {
   .flash-editor {
     min-width: 0;
   }
@@ -1600,6 +1544,51 @@ button {
     display: none;
   }
 
+  /* Keep side-by-side workspace; only shrink the right dock */
+  .right-dock {
+    width: 200px;
+    flex-basis: 200px;
+    min-width: 160px;
+    max-width: 36vw;
+  }
+
+  .stage-dock {
+    min-height: 140px;
+  }
+}
+
+/* Short windows (e.g. 800×600): protect stage vertical space */
+@media (max-height: 700px) {
+  .timeline-shell {
+    max-height: min(180px, 32vh);
+  }
+
+  .stage-dock {
+    min-height: 160px;
+  }
+
+  .scene-tabs {
+    flex-basis: 24px;
+  }
+
+  .stage-status {
+    flex-basis: 20px;
+    font-size: 9px;
+  }
+}
+
+@media (max-height: 560px) {
+  .timeline-shell {
+    max-height: min(140px, 28vh);
+  }
+
+  .stage-dock {
+    min-height: 120px;
+  }
+}
+
+/* Only stack the right dock under the stage on very narrow widths */
+@media (max-width: 640px) {
   .workspace-row {
     flex-direction: column;
   }
@@ -1607,7 +1596,7 @@ button {
   .workspace-main {
     flex-direction: column;
     min-height: 0;
-    flex: 1;
+    flex: 1 1 auto;
   }
 
   .tools-dock {
@@ -1615,8 +1604,8 @@ button {
     flex: 0 0 auto;
     flex-direction: row;
     align-items: center;
-    gap: 10px;
-    padding: 6px 8px;
+    gap: 8px;
+    padding: 4px 8px;
     overflow-x: auto;
     border-right: 0;
     border-bottom: 1px solid var(--yo-line);
@@ -1630,25 +1619,50 @@ button {
   .tool-grid {
     width: auto;
     display: flex;
+    flex-wrap: nowrap;
   }
 
-  .tool-chip-stack {
+  .tool-style-group {
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
     margin-top: 0;
     padding-top: 0;
+    border-top: 0;
+  }
+
+  .right-dock-toggle {
+    flex: 0 0 22px;
+    width: 100%;
+    height: 22px;
+    border-left: 0;
+    border-top: 1px solid var(--yo-line);
   }
 
   .right-dock {
     width: 100%;
-    flex: 0 0 220px;
+    flex: 0 0 auto;
+    min-width: 0;
     max-width: none;
+    max-height: min(200px, 34vh);
     flex-direction: column;
     border-left: 0;
     border-top: 1px solid var(--yo-line);
   }
 
+  .right-dock-body {
+    min-height: 0;
+    overflow: auto;
+  }
+
   .panel-block {
     flex: 1;
     min-width: 0;
+  }
+
+  .stage-dock {
+    flex: 1 1 auto;
+    min-height: 140px;
   }
 }
 
@@ -2036,8 +2050,7 @@ button {
 .prop-body,
 .library-list,
 .stage-canvas,
-.timeline-shell,
-.yo-scroll {
+.timeline-shell {
   scrollbar-width: thin;
   scrollbar-color: #4b606a transparent;
 }
@@ -2047,8 +2060,7 @@ button {
 .prop-body::-webkit-scrollbar,
 .library-list::-webkit-scrollbar,
 .stage-canvas::-webkit-scrollbar,
-.timeline-shell::-webkit-scrollbar,
-.yo-scroll::-webkit-scrollbar {
+.timeline-shell::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
@@ -2058,8 +2070,7 @@ button {
 .prop-body::-webkit-scrollbar-track,
 .library-list::-webkit-scrollbar-track,
 .stage-canvas::-webkit-scrollbar-track,
-.timeline-shell::-webkit-scrollbar-track,
-.yo-scroll::-webkit-scrollbar-track {
+.timeline-shell::-webkit-scrollbar-track {
   background: transparent;
 }
 
@@ -2068,8 +2079,7 @@ button {
 .prop-body::-webkit-scrollbar-thumb,
 .library-list::-webkit-scrollbar-thumb,
 .stage-canvas::-webkit-scrollbar-thumb,
-.timeline-shell::-webkit-scrollbar-thumb,
-.yo-scroll::-webkit-scrollbar-thumb {
+.timeline-shell::-webkit-scrollbar-thumb {
   background: #4b606a;
   border-radius: 4px;
   border: 2px solid transparent;
@@ -2081,8 +2091,7 @@ button {
 .prop-body::-webkit-scrollbar-thumb:hover,
 .library-list::-webkit-scrollbar-thumb:hover,
 .stage-canvas::-webkit-scrollbar-thumb:hover,
-.timeline-shell::-webkit-scrollbar-thumb:hover,
-.yo-scroll::-webkit-scrollbar-thumb:hover {
+.timeline-shell::-webkit-scrollbar-thumb:hover {
   background: #60727c;
   border: 2px solid transparent;
   background-clip: padding-box;
@@ -2093,8 +2102,7 @@ button {
 .prop-body::-webkit-scrollbar-corner,
 .library-list::-webkit-scrollbar-corner,
 .stage-canvas::-webkit-scrollbar-corner,
-.timeline-shell::-webkit-scrollbar-corner,
-.yo-scroll::-webkit-scrollbar-corner {
+.timeline-shell::-webkit-scrollbar-corner {
   background: transparent;
 }
 
@@ -2154,9 +2162,10 @@ button {
 .stage-canvas-wrap {
   position: relative;
   flex: 1 1 auto;
-  min-height: 0;
+  min-height: 80px;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .edit-target-bar {
@@ -2431,4 +2440,211 @@ button {
 }
 .path-edit-hint-btn:hover {
   filter: brightness(1.08);
+}
+
+/* ——— Shared YOKOZUNA dialog (modal) ——— */
+.yo-dialog-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 12000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(8, 12, 14, 0.68);
+  box-sizing: border-box;
+}
+.yo-dialog {
+  background: #202d34;
+  border: 1px solid #526873;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55);
+  color: var(--yo-ink);
+  border-radius: 2px;
+  max-height: min(90vh, 720px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.yo-dialog--sm { width: min(360px, calc(100vw - 32px)); }
+.yo-dialog--md { width: min(440px, calc(100vw - 32px)); }
+.yo-dialog--lg { width: min(560px, calc(100vw - 32px)); }
+.yo-dialog-form { display: flex; flex-direction: column; min-height: 0; }
+.yo-dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px 8px;
+  flex: 0 0 auto;
+}
+.yo-dialog-title {
+  color: var(--yo-accent);
+  font: 700 15px var(--yo-display);
+  letter-spacing: 1px;
+}
+.yo-dialog-close {
+  border: 0;
+  background: transparent;
+  color: var(--yo-muted);
+  font-size: 18px;
+  line-height: 1;
+  width: 28px;
+  height: 28px;
+  cursor: pointer;
+  border-radius: 2px;
+}
+.yo-dialog-close:hover { background: #3a4a52; color: #fff; }
+.yo-dialog-body {
+  padding: 8px 16px 12px;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.yo-dialog-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 16px 14px;
+  border-top: 1px solid #3b4a51;
+  flex: 0 0 auto;
+}
+.yo-dialog-actions { display: flex; gap: 8px; margin-left: auto; }
+.yo-dialog-btn {
+  min-width: 88px;
+  padding: 6px 14px;
+  border: 1px solid #526873;
+  background: #2a383f;
+  color: var(--yo-ink);
+  cursor: pointer;
+  font-size: 12px;
+}
+.yo-dialog-btn:hover:not(:disabled) { background: #35464e; }
+.yo-dialog-btn:disabled { opacity: 0.45; cursor: default; }
+.yo-dialog-btn-primary {
+  background: var(--yo-accent);
+  border-color: var(--yo-accent-2);
+  color: #fff;
+  font-weight: 600;
+}
+.yo-dialog-btn-primary:hover:not(:disabled) { filter: brightness(1.08); }
+.yo-dialog-busy { font-size: 11px; color: var(--yo-muted); }
+.yo-dialog-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.yo-dialog-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--yo-muted);
+}
+.yo-dialog-field.is-full { grid-column: 1 / -1; }
+.yo-dialog-field input[type="text"],
+.yo-dialog-field input[type="number"],
+.yo-dialog-field select {
+  background: #1a2429;
+  border: 1px solid #3e4d54;
+  color: var(--yo-ink);
+  padding: 6px 8px;
+  border-radius: 2px;
+  width: 100%;
+}
+.yo-dialog-field input:focus,
+.yo-dialog-field select:focus {
+  outline: 1px solid var(--yo-accent);
+  border-color: var(--yo-accent);
+}
+.yo-dialog-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--yo-ink);
+  cursor: pointer;
+}
+.yo-dialog-check input { accent-color: var(--yo-accent); }
+.yo-dialog-hint {
+  margin: 0;
+  font-size: 11px;
+  color: var(--yo-muted);
+  line-height: 1.45;
+}
+
+/* Center native document settings dialog in the app window */
+.settings-dialog {
+  position: fixed !important;
+  inset: 0 !important;
+  margin: auto !important;
+  max-height: min(90vh, 640px);
+  top: 50% !important;
+  left: 50% !important;
+  transform: translate(-50%, -50%);
+  right: auto !important;
+  bottom: auto !important;
+}
+.settings-dialog[open] {
+  display: block;
+}
+
+.yo-text-edit-overlay {
+  /* Inline stage editor: transparent so it feels like editing the object itself */
+  background: transparent;
+  border: 1px solid var(--yo-accent);
+  box-shadow: 0 0 0 1px rgba(224, 90, 60, 0.25);
+  border-radius: 1px;
+  padding: 1px 2px;
+  margin: 0;
+  outline: none;
+  caret-color: var(--yo-accent);
+  white-space: pre-wrap;
+  overflow: hidden;
+  box-sizing: border-box;
+  /* Position/size/font come from inline style (zoom/pan/CTM-aware) */
+}
+
+.keyframe-context-menu {
+  position: fixed;
+  z-index: 10000;
+  min-width: 180px;
+  padding: 4px 0;
+  background: #24333a;
+  border: 1px solid #526873;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
+  border-radius: 2px;
+  user-select: none;
+}
+.keyframe-context-menu button {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border: 0;
+  background: transparent;
+  color: var(--yo-ink);
+  padding: 6px 12px;
+  font-size: 11px;
+  text-align: left;
+  cursor: pointer;
+}
+.keyframe-context-menu button:hover:not(:disabled) {
+  background: #9a4030;
+  color: #fff;
+}
+.keyframe-context-menu button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.keyframe-context-menu button.active {
+  color: var(--yo-accent);
+}
+.keyframe-context-menu .menu-section-label {
+  padding: 6px 12px 2px;
+  font-size: 10px;
+  color: var(--yo-muted);
+  letter-spacing: 0.4px;
 }

@@ -1,7 +1,7 @@
 import type { Project, Composition, Layer, Keyframe } from "@/types/project";
 
 export function createEmptyProject(name = "無題のプロジェクト"): Project {
-  const now = "2026-09-01T00:00:00.000Z";
+  const now = new Date().toISOString();
   const mainCompId = "comp_main";
   const firstLayerId = "layer_1";
 

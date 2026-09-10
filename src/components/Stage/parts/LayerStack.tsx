@@ -14,6 +14,7 @@ type LayerStackProps = {
   stageWidth: number;
   stageHeight: number;
   selectedLayerId: string | undefined;
+  suppressElementIds?: ReadonlySet<string> | string[];
 };
 
 /** Paint-order layer stack incl. onion skin, masks and guides. */
@@ -45,6 +46,7 @@ export function LayerStack(p: LayerStackProps) {
                 p.project,
                 p.currentFrame,
                 "guide",
+                p.suppressElementIds,
               )}
             </g>
           );
@@ -68,6 +70,7 @@ export function LayerStack(p: LayerStackProps) {
                       p.project,
                       p.currentFrame,
                       "normal",
+                      p.suppressElementIds,
                     )}
                   </g>
                 );
@@ -103,6 +106,7 @@ export function LayerStack(p: LayerStackProps) {
                     p.project,
                     p.currentFrame,
                     "mask",
+                    p.suppressElementIds,
                   )}
               </mask>
             </defs>
@@ -116,6 +120,7 @@ export function LayerStack(p: LayerStackProps) {
                       p.project,
                       p.currentFrame,
                       "normal",
+                      p.suppressElementIds,
                     )}
                   </g>
                 );
@@ -129,6 +134,7 @@ export function LayerStack(p: LayerStackProps) {
                   p.project,
                   p.currentFrame,
                   "mask-overlay",
+                  p.suppressElementIds,
                 )}
               </g>
             )}

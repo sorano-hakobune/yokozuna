@@ -1,10 +1,10 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 import { createPortal } from "react-dom";
+import { clampMenuPosition } from "@/components/ui/ContextMenu";
 
 export type StageContextMenuState = {
   x: number;
   y: number;
-  /** Element under cursor when menu opened (may already be selected). */
   targetElementId: string | null;
   targetLayerId: string | null;
 };
@@ -24,6 +24,8 @@ type Props = {
   onSendToBack: () => void;
   canEditPathVertices?: boolean;
   onEditPathVertices?: () => void;
+  canResetPivot?: boolean;
+  onResetPivot?: () => void;
 };
 
 type Item =
@@ -45,6 +47,8 @@ export function StageContextMenu({
   onSendToBack,
   canEditPathVertices = false,
   onEditPathVertices,
+  canResetPivot = false,
+  onResetPivot,
 }: Props) {
   const ref = useRef<HTMLDivElement>(null);
 
@@ -56,90 +60,38 @@ export function StageContextMenu({
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
     };
-    // next tick so the opening click does not immediately close
     const t = window.setTimeout(() => {
-      document.addEventListener("mousedown", onDoc);
-      document.addEventListener("keydown", onKey);
+      document.addEventListener("mousedown", onDoc, true);
+      document.addEventListener("keydown", onKey, true);
     }, 0);
     return () => {
       window.clearTimeout(t);
-      document.removeEventListener("mousedown", onDoc);
-      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("mousedown", onDoc, true);
+      document.removeEventListener("keydown", onKey, true);
     };
   }, [onClose]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
     const rect = el.getBoundingClientRect();
-    let left = menu.x;
-    let top = menu.y;
-    if (left + rect.width > window.innerWidth - 8) {
-      left = Math.max(8, window.innerWidth - rect.width - 8);
-    }
-    if (top + rect.height > window.innerHeight - 8) {
-      top = Math.max(8, window.innerHeight - rect.height - 8);
-    }
+    const { left, top } = clampMenuPosition(menu.x, menu.y, rect.width, rect.height);
     el.style.left = `${left}px`;
     el.style.top = `${top}px`;
   }, [menu.x, menu.y]);
 
   const items: Item[] = [
-    {
-      kind: "item",
-      label: "コピー",
-      shortcut: "Ctrl+C",
-      disabled: !hasSelection,
-      action: onCopy,
-    },
-    {
-      kind: "item",
-      label: "切り取り",
-      shortcut: "Ctrl+X",
-      disabled: !hasSelection || !canEdit,
-      action: onCut,
-    },
-    {
-      kind: "item",
-      label: "貼り付け",
-      shortcut: "Ctrl+V",
-      disabled: !hasClipboard || !canEdit,
-      action: onPaste,
-    },
+    { kind: "item", label: "コピー", shortcut: "Ctrl+C", disabled: !hasSelection, action: onCopy },
+    { kind: "item", label: "切り取り", shortcut: "Ctrl+X", disabled: !hasSelection || !canEdit, action: onCut },
+    { kind: "item", label: "貼り付け", shortcut: "Ctrl+V", disabled: !hasClipboard || !canEdit, action: onPaste },
     { kind: "sep" },
-    {
-      kind: "item",
-      label: "複製",
-      shortcut: "Ctrl+D",
-      disabled: !hasSelection || !canEdit,
-      action: onDuplicate,
-    },
-    {
-      kind: "item",
-      label: "削除",
-      shortcut: "Del",
-      disabled: !hasSelection || !canEdit,
-      action: onDelete,
-    },
-    {
-      kind: "item",
-      label: "頂点を編集",
-      disabled: !canEditPathVertices || !canEdit,
-      action: () => onEditPathVertices?.(),
-    },
+    { kind: "item", label: "複製", shortcut: "Ctrl+D", disabled: !hasSelection || !canEdit, action: onDuplicate },
+    { kind: "item", label: "削除", shortcut: "Del", disabled: !hasSelection || !canEdit, action: onDelete },
+    { kind: "item", label: "頂点を編集", disabled: !canEditPathVertices || !canEdit, action: () => onEditPathVertices?.() },
+    { kind: "item", label: "基準点を図形の中心に戻す", disabled: !canResetPivot || !canEdit, action: () => onResetPivot?.() },
     { kind: "sep" },
-    {
-      kind: "item",
-      label: "前面へ移動",
-      disabled: !hasSelection || !canEdit,
-      action: onBringToFront,
-    },
-    {
-      kind: "item",
-      label: "背面へ移動",
-      disabled: !hasSelection || !canEdit,
-      action: onSendToBack,
-    },
+    { kind: "item", label: "前面へ移動", disabled: !hasSelection || !canEdit, action: onBringToFront },
+    { kind: "item", label: "背面へ移動", disabled: !hasSelection || !canEdit, action: onSendToBack },
   ];
 
   return createPortal(
@@ -149,6 +101,7 @@ export function StageContextMenu({
       style={{ left: menu.x, top: menu.y }}
       role="menu"
       onContextMenu={(e) => e.preventDefault()}
+      onMouseDown={(e) => e.stopPropagation()}
     >
       {items.map((item, i) =>
         item.kind === "sep" ? (

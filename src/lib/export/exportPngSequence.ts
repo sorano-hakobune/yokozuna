@@ -1,5 +1,9 @@
 import type { Project } from "@/types/project";
-import { downloadBlob, sanitizeFileName, sleep } from "@/lib/file-utils";
+import {
+  saveBlobAs,
+  saveBlobsToDirectory,
+  sanitizeFileName,
+} from "@/lib/file-utils";
 import {
   canvasToPngBlob,
   preloadProjectImages,
@@ -63,7 +67,6 @@ export async function exportPngSequence(
   const scale = options.scale ?? 1;
   const transparent = options.transparent === true;
   const asZip = options.asZip ?? total > 1;
-  const delay = options.downloadDelayMs ?? 120;
 
   const cache = await preloadProjectImages(project);
   let exported = 0;
@@ -95,8 +98,8 @@ export async function exportPngSequence(
     if (asZip) {
       zipFiles.push({ name: fileName, data: await blobToUint8Array(blob) });
     } else {
-      downloadBlob(blob, fileName);
-      if (frame < end) await sleep(delay);
+      // Collect for a single directory save after the loop
+      zipFiles.push({ name: fileName, data: await blobToUint8Array(blob) });
     }
 
     exported += 1;
@@ -106,8 +109,40 @@ export async function exportPngSequence(
   if (asZip && zipFiles.length > 0) {
     const zipBlob = buildZipBlob(zipFiles);
     const zipName = `${prefix}_png_sequence.zip`;
-    downloadBlob(zipBlob, zipName);
+    const saveResult = await saveBlobAs(zipBlob, {
+      fileName: zipName,
+      extensions: ["zip"],
+      description: "PNG Sequence ZIP",
+      mimeTypes: ["application/zip"],
+    });
+    if (saveResult.status === "cancelled") {
+      return { exported: 0, cancelled: true, mode: "zip" };
+    }
     options.onProgress?.(exported, total, zipName);
+  } else if (!asZip && zipFiles.length === 1) {
+    const only = zipFiles[0]!;
+    const blob = new Blob([only.data], { type: "image/png" });
+    const saveResult = await saveBlobAs(blob, {
+      fileName: only.name,
+      extensions: ["png"],
+      description: "PNG Image",
+      mimeTypes: ["image/png"],
+    });
+    if (saveResult.status === "cancelled") {
+      return { exported: 0, cancelled: true, mode: "files" };
+    }
+  } else if (!asZip && zipFiles.length > 1) {
+    const files = zipFiles.map((f) => ({
+      name: f.name,
+      blob: new Blob([f.data], { type: "image/png" }),
+    }));
+    const dirResult = await saveBlobsToDirectory(files, {
+      directoryTitle: "PNG連番の保存先フォルダ",
+    });
+    if (dirResult.status === "cancelled") {
+      return { exported: 0, cancelled: true, mode: "files" };
+    }
+    exported = dirResult.written;
   }
 
   return { exported, cancelled: false, mode: asZip ? "zip" : "files" };

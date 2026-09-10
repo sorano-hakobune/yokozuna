@@ -1,5 +1,10 @@
 import { useProjectStore } from "@/stores/projectStore";
-import { downloadProjectJson, openProjectFile, pickFiles } from "@/lib/project";
+import {
+  downloadProjectJson,
+  openProjectFile,
+  pickFiles,
+  PROJECT_FILE_ACCEPT,
+} from "@/lib/project";
 
 export function useProjectFileActions() {
   const project = useProjectStore((state) => state.project);
@@ -8,8 +13,14 @@ export function useProjectFileActions() {
   const isDocumentDirty = useProjectStore((state) => state.isDocumentDirty);
 
   const saveProject = () => {
-    downloadProjectJson(project);
-    markProjectSaved();
+    void downloadProjectJson(project).then((result) => {
+      if (result.status === "cancelled") return;
+      const chosen = result.fileName.replace(/\.[^.]+$/, "");
+      if (chosen && chosen !== project.meta.name) {
+        useProjectStore.getState().updateMeta({ name: chosen });
+      }
+      markProjectSaved();
+    });
   };
 
   const openProject = async () => {
@@ -19,7 +30,7 @@ export function useProjectFileActions() {
     ) {
       return;
     }
-    const file = await pickFiles({ accept: "application/json,.json" }).then(
+    const file = await pickFiles({ accept: PROJECT_FILE_ACCEPT }).then(
       ([selected]) => selected,
     );
     if (file) await openProjectFile(file, setProject);
