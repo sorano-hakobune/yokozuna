@@ -217,6 +217,49 @@ const StageInner: React.FC = () => {
   const layers = useActiveLayers();
   const activeLayer = useSelectedLayer();
 
+  // 編集中に Inspector 等でフォント設定が変わったら入力欄にも反映する。
+  // DOM サイズ自体は TextEditOverlay の自動伸縮 effect が再計算する。
+  // プロジェクトデータへの書き込みは行わない (Undo履歴を汚さない)。
+  useEffect(() => {
+    if (!textEdit?.elementId) return;
+    const editId = textEdit.elementId;
+    let live: ShapeElement | null = null;
+    for (const layer of layers) {
+      const el = getElementsAtFrame(layer.keyframes, currentFrame).find(
+        (e) => e.id === editId,
+      );
+      if (el && el.type === "shape" && (el as ShapeElement).shapeType === "text") {
+        live = el as ShapeElement;
+        break;
+      }
+    }
+    if (!live) return;
+    const l = live;
+    setTextEdit((prev) => {
+      if (!prev || prev.elementId !== editId) return prev;
+      const patch: Partial<TextEditSession> = {};
+      if ((l.fontSize ?? 24) !== prev.fontSize) patch.fontSize = l.fontSize ?? 24;
+      if ((l.fontFamily ?? "sans-serif") !== prev.fontFamily)
+        patch.fontFamily = l.fontFamily ?? "sans-serif";
+      if ((l.fill ?? "#e8eef2") !== prev.fill) patch.fill = l.fill ?? "#e8eef2";
+      if ((l.textOrientation ?? "horizontal") !== prev.textOrientation)
+        patch.textOrientation = l.textOrientation === "vertical" ? "vertical" : "horizontal";
+      if ((l.fontWeight ?? "normal") !== (prev.fontWeight ?? "normal"))
+        patch.fontWeight = l.fontWeight ?? "normal";
+      if ((l.fontStyle ?? "normal") !== (prev.fontStyle ?? "normal"))
+        patch.fontStyle = (l.fontStyle ?? "normal") as TextEditSession["fontStyle"];
+      if ((l.letterSpacing ?? 0) !== (prev.letterSpacing ?? 0))
+        patch.letterSpacing = l.letterSpacing ?? 0;
+      if ((l.lineHeight ?? 1.2) !== (prev.lineHeight ?? 1.2))
+        patch.lineHeight = l.lineHeight ?? 1.2;
+      if ((l.textAlign ?? "left") !== (prev.textAlign ?? "left"))
+        patch.textAlign = l.textAlign ?? "left";
+      if (Object.keys(patch).length === 0) return prev;
+      return { ...prev, ...patch };
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [layers, currentFrame]);
+
   const handleDrop = async (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     setIsDragOver(false);
@@ -390,6 +433,13 @@ const StageInner: React.FC = () => {
 
   const handleMouseDown = (e: React.PointerEvent<SVGSVGElement>) => {
     if (e.button !== 0 && e.button !== 1) return;
+    // テキスト編集中のクリックは確定だけに使う。新規セッション開始・描画開始・
+    // パン等は行わない。mousedown は blur より先に発火するため、ここで
+    // セッションを上書きすると blur の commit が新セッション側で実行されて
+    // テキストが複製される。二重 commit 防止のため早期 return し、確定は
+    // overlay の blur (単一 commit) に任せる。preventDefault も行わない
+    // (フォーカス移動=blur を妨げないため)。
+    if (textEdit) return;
     e.preventDefault();
 
     activePointerIdRef.current = e.pointerId;
@@ -844,6 +894,11 @@ const StageInner: React.FC = () => {
         rotation: 0,
         scaleX: 1,
         scaleY: 1,
+        fontWeight: "normal",
+        fontStyle: "normal",
+        letterSpacing: 0,
+        lineHeight: 1.2,
+        textAlign: "left",
       });
       setSelectedLayerId(activeLayer.id);
       releasePointer(e.pointerId);
@@ -1848,7 +1903,13 @@ const StageInner: React.FC = () => {
               // Edit existing: only text + measured box, never reset other attrs
               const fontSize = session.fontSize;
               const orient = session.textOrientation;
-              const box = measureTextBox(textVal || " ", fontSize, orient);
+              const box = measureTextBox(textVal || " ", fontSize, orient, {
+                fontFamily: session.fontFamily,
+                fontWeight: session.fontWeight,
+                fontStyle: session.fontStyle,
+                letterSpacing: session.letterSpacing,
+                lineHeight: session.lineHeight,
+              });
               updateElement(session.layerId, currentFrame, session.elementId, {
                 text: textVal,
                 width: box.width,
@@ -1862,6 +1923,11 @@ const StageInner: React.FC = () => {
                 textOrientation: orient,
                 fontSize,
                 fontFamily: session.fontFamily,
+                fontWeight: session.fontWeight,
+                fontStyle: (session.fontStyle ?? "normal") as "normal" | "italic",
+                letterSpacing: session.letterSpacing,
+                lineHeight: session.lineHeight,
+                textAlign: session.textAlign,
               });
               useProjectStore
                 .getState()

@@ -1,6 +1,7 @@
 import type { ShapeElement } from "@/types/project";
 import { generateId } from "@/lib/id";
 import { simplifyPath } from "./pathSimplify";
+import { measureTextBox } from "./textMeasure";
 
 /**
  * 矩形図形を作成
@@ -150,17 +151,16 @@ export function createTextShape(
   const orientation = options?.textOrientation ?? "horizontal";
   const fontSize = options?.fontSize ?? 24;
   const content = text || "テキスト";
-  // Approximate box for selection handles
-  const width =
-    options?.width ??
-    (orientation === "vertical"
-      ? fontSize * 1.4
-      : Math.max(fontSize, content.length * fontSize * 0.6));
-  const height =
-    options?.height ??
-    (orientation === "vertical"
-      ? Math.max(fontSize, content.length * fontSize * 1.1)
-      : fontSize * 1.4);
+  // 入力欄と一致する自然なボックス (複数行・縦書き対応、Canvas 実測)
+  const measured = measureTextBox(content, fontSize, orientation, {
+    fontFamily: options?.fontFamily,
+    fontWeight: options?.fontWeight,
+    fontStyle: options?.fontStyle,
+    letterSpacing: options?.letterSpacing,
+    lineHeight: options?.lineHeight,
+  });
+  const width = options?.width ?? measured.width;
+  const height = options?.height ?? measured.height;
   return {
     id: generateId("shape"),
     type: "shape",

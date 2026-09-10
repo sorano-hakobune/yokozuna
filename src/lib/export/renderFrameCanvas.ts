@@ -141,6 +141,11 @@ function drawShape(ctx: CanvasRenderingContext2D, shape: ShapeElement) {
       const weight = shape.fontWeight ?? "normal";
       const style = shape.fontStyle ?? "normal";
       const family = shape.fontFamily ?? "sans-serif";
+      const rawLh = Number(shape.lineHeight);
+      const lhFactor =
+        Number.isFinite(rawLh) && rawLh >= 0.5 && rawLh <= 4 ? rawLh : 1.2;
+      const lh = fontSize * lhFactor;
+      const lines = content.replace(/\r\n?/g, "\n").split("\n");
       ctx.font = `${style} ${weight} ${fontSize}px ${family}`;
       ctx.fillStyle = fill ?? "#e8eef2";
       ctx.textAlign =
@@ -151,22 +156,33 @@ function drawShape(ctx: CanvasRenderingContext2D, shape: ShapeElement) {
             : "left";
       if (vertical) {
         // Character-by-character vertical layout (not a block rotation)
+        // 改行ごとに左へ新しい列
         ctx.textBaseline = "top";
-        const chars = Array.from(content);
-        const startY = -(shape.height ?? chars.length * fontSize * 1.1) / 2;
-        const x = 0;
-        chars.forEach((ch, i) => {
-          ctx.fillText(ch, x, startY + i * fontSize * (shape.lineHeight ?? 1.1));
+        const w = shape.width ?? fontSize * 1.4;
+        const h = shape.height ?? fontSize * lhFactor;
+        const startY = -h / 2;
+        const ls = Number(shape.letterSpacing ?? 0) || 0;
+        const step = fontSize + (ls > 0 ? ls : 0);
+        lines.forEach((col, colIdx) => {
+          const x = w / 2 - lh / 2 - colIdx * lh;
+          const chars = Array.from(col);
+          if (chars.length === 0) return;
+          chars.forEach((ch, i) => {
+            ctx.fillText(ch, x, startY + i * step);
+          });
         });
       } else {
         ctx.textBaseline = "middle";
+        const firstY = -((lines.length - 1) * lh) / 2;
         const x =
           ctx.textAlign === "center"
             ? 0
             : ctx.textAlign === "right"
               ? (shape.width ?? 0) / 2
               : -(shape.width ?? 0) / 2;
-        ctx.fillText(content, x, 0);
+        lines.forEach((line, i) => {
+          ctx.fillText(line === "" ? " " : line, x, firstY + i * lh);
+        });
       }
       break;
     }

@@ -8,6 +8,7 @@ import type {
 import { samplePathPoints } from "@/lib/draw/pathBezier";
 import { lerpFilters } from "@/lib/filters";
 import { lerpGradient } from "@/lib/draw/gradient";
+import { measureTextBox } from "@/lib/draw/textMeasure";
 import { applyEasing } from "./easing";
 import {
   pointOnMotionPath,
@@ -304,16 +305,20 @@ export function shapeToContour(
       const fontSize = shape.fontSize ?? 24;
       const content = shape.text ?? "";
       const vertical = shape.textOrientation === "vertical";
-      const w =
-        shape.width ??
-        (vertical
-          ? fontSize * 1.4
-          : Math.max(40, content.length * fontSize * 0.6));
-      const h =
-        shape.height ??
-        (vertical
-          ? Math.max(fontSize, content.length * fontSize * 1.1)
-          : fontSize * 1.4);
+      const fallback = measureTextBox(
+        content || " ",
+        fontSize,
+        vertical ? "vertical" : "horizontal",
+        {
+          fontFamily: shape.fontFamily,
+          fontWeight: shape.fontWeight,
+          fontStyle: shape.fontStyle,
+          letterSpacing: shape.letterSpacing,
+          lineHeight: shape.lineHeight,
+        },
+      );
+      const w = shape.width ?? fallback.width;
+      const h = shape.height ?? fallback.height;
       const hw = w / 2;
       const hh = h / 2;
       const corners: Pt[] = [

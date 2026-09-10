@@ -1,5 +1,12 @@
 import type { Element, ShapeElement } from "@/types/project";
 import { samplePathPoints } from "@/lib/draw/pathBezier";
+import {
+  clampLineHeightFactor,
+  horizontalInkBounds,
+  maxCharsPerLine,
+  splitContentLines,
+  verticalInkBounds,
+} from "@/lib/draw/textLayout";
 
 export type Point = { x: number; y: number };
 
@@ -96,69 +103,61 @@ function measureTextWidth(
 function getTextLocalBounds(shape: ShapeElement): LocalBounds {
   const fontSize = shape.fontSize ?? 24;
   const content = shape.text ?? "";
-  const chars = Array.from(content);
-  const len = chars.length;
+  const lines = splitContentLines(content);
+  const lineCount = Math.max(1, lines.length);
   const vertical = shape.textOrientation === "vertical";
+  const lineHFactor = clampLineHeightFactor(shape.lineHeight);
   const strokePad =
     shape.stroke && shape.stroke !== "none" ? (shape.strokeWidth ?? 0) / 2 : 0;
 
   if (vertical) {
     const layoutW = shape.width ?? fontSize * 1.4;
-    const layoutH =
-      shape.height ?? Math.max(fontSize, Math.max(1, len) * fontSize * 1.1);
-    const colW = Math.max(4, fontSize);
-    const lineH = shape.lineHeight ?? 1.1;
-    const colH = Math.max(fontSize, len * fontSize * lineH);
-    const startY = -layoutH / 2;
-    const minY = startY;
-    const maxY = startY + (len === 0 ? fontSize : colH);
-    let minX: number;
-    let maxX: number;
-    if (shape.textAlign === "center") {
-      minX = -colW / 2;
-      maxX = colW / 2;
-    } else if (shape.textAlign === "right") {
-      maxX = layoutW / 2;
-      minX = maxX - colW;
-    } else {
-      minX = -layoutW / 2;
-      maxX = minX + colW;
-    }
-    const cx = (minX + maxX) / 2;
-    const cy = (minY + maxY) / 2;
+    const layoutH = shape.height ?? Math.max(fontSize, fontSize * 1.1);
+    const lh = fontSize * lineHFactor;
+    // 描画 (LayerContent) と同じ列配置からインク境界を求める
+    const b = verticalInkBounds(
+      layoutW,
+      layoutH,
+      fontSize,
+      lh,
+      lineCount,
+      maxCharsPerLine(lines),
+      shape.letterSpacing,
+    );
+    const cx = (b.minX + b.maxX) / 2;
+    const cy = (b.minY + b.maxY) / 2;
     return {
-      halfW: Math.max(1, (maxX - minX) / 2 + strokePad),
-      halfH: Math.max(1, (maxY - minY) / 2 + strokePad),
+      halfW: Math.max(1, (b.maxX - b.minX) / 2 + strokePad),
+      halfH: Math.max(1, (b.maxY - b.minY) / 2 + strokePad),
       cx,
       cy,
     };
   }
 
-  const layoutW =
-    shape.width ?? Math.max(40, Math.max(1, len) * fontSize * 0.6);
-  const tw =
-    len === 0 ? fontSize * 0.5 : measureTextWidth(content, shape, fontSize);
-  const th = Math.max(4, fontSize);
-  const y = fontSize * 0.35;
-  const minY = y - th / 2;
-  const maxY = y + th / 2;
-  let minX: number;
-  let maxX: number;
-  if (shape.textAlign === "center") {
-    minX = -tw / 2;
-    maxX = tw / 2;
-  } else if (shape.textAlign === "right") {
-    maxX = layoutW / 2;
-    minX = maxX - tw;
-  } else {
-    minX = -layoutW / 2;
-    maxX = minX + tw;
+  const layoutW = shape.width ?? Math.max(40, fontSize * 0.6);
+  let tw = 0;
+  for (const line of lines) {
+    tw = Math.max(
+      tw,
+      line === "" ? 0 : measureTextWidth(line, shape, fontSize),
+    );
   }
-  const cx = (minX + maxX) / 2;
-  const cy = (minY + maxY) / 2;
+  if (tw === 0) tw = fontSize * 0.5;
+  const lh = fontSize * lineHFactor;
+  // 描画 (LayerContent) と同じアンカー・ベースラインからインク境界を求める
+  const b = horizontalInkBounds(
+    layoutW,
+    fontSize,
+    lh,
+    lineCount,
+    tw,
+    shape.textAlign,
+  );
+  const cx = (b.minX + b.maxX) / 2;
+  const cy = (b.minY + b.maxY) / 2;
   return {
-    halfW: Math.max(1, (maxX - minX) / 2 + strokePad),
-    halfH: Math.max(1, (maxY - minY) / 2 + strokePad),
+    halfW: Math.max(1, (b.maxX - b.minX) / 2 + strokePad),
+    halfH: Math.max(1, (b.maxY - b.minY) / 2 + strokePad),
     cx,
     cy,
   };

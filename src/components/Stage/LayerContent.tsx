@@ -9,6 +9,13 @@ import { getElementsAtFrame } from "@/lib/animation/interpolate";
 import { shapeToPathD } from "@/lib/draw/pathBezier";
 import { SvgFilterDefs, elementFilterId } from "@/lib/filters";
 import { svgGradientDef } from "@/lib/draw/gradient";
+import {
+  clampLineHeightFactor,
+  horizontalAnchorX,
+  horizontalFirstBaselineY,
+  splitContentLines,
+  verticalColumnX,
+} from "@/lib/draw/textLayout";
 import { elementSvgTransform } from "./transformGeometry";
 
 const elementTransform = (shape: ShapeElement) => elementSvgTransform(shape);
@@ -115,6 +122,9 @@ const VectorShape: React.FC<{
       const content = shape.text ?? "";
       const fontSize = shape.fontSize ?? 24;
       const vertical = shape.textOrientation === "vertical";
+      const lines = splitContentLines(content);
+      const lineHeightFactor = clampLineHeightFactor(shape.lineHeight);
+      const lh = fontSize * lineHeightFactor;
       const w = shape.width ?? (vertical ? fontSize * 1.4 : Math.max(40, content.length * fontSize * 0.6));
       const h = shape.height ?? (vertical ? Math.max(fontSize, content.length * fontSize * 1.1) : fontSize * 1.4);
       const textFill = isMask
@@ -133,13 +143,17 @@ const VectorShape: React.FC<{
           : shape.textAlign === "right"
             ? "end"
             : "start";
-      const x =
-        textAnchor === "middle"
-          ? 0
-          : textAnchor === "end"
-            ? w / 2
-            : -w / 2;
-      const y = vertical ? -h / 2 : fontSize * 0.35;
+      // 選択境界 (transformGeometry) と同じアンカーを使う
+      const anchorX = horizontalAnchorX(w, shape.textAlign);
+      const textProps = {
+        fill: textFill,
+        fontFamily: shape.fontFamily ?? "sans-serif",
+        fontSize,
+        fontWeight: shape.fontWeight ?? "normal",
+        fontStyle: shape.fontStyle ?? "normal",
+        letterSpacing: shape.letterSpacing ?? 0,
+        opacity: isGuide ? 0.85 : 1,
+      };
       body = (
         <g transform={elementTransform(shape)}>
           <rect
@@ -152,25 +166,46 @@ const VectorShape: React.FC<{
             strokeDasharray={isGuide ? "4 3" : undefined}
             pointerEvents="none"
           />
-          <text
-            x={x}
-            y={y}
-            fill={textFill}
-            fontFamily={shape.fontFamily ?? "sans-serif"}
-            fontSize={fontSize}
-            fontWeight={shape.fontWeight ?? "normal"}
-            fontStyle={shape.fontStyle ?? "normal"}
-            letterSpacing={shape.letterSpacing ?? 0}
-            textAnchor={textAnchor}
-            dominantBaseline={vertical ? "hanging" : "middle"}
-            style={{
-              writingMode: writingMode as React.CSSProperties["writingMode"],
-              userSelect: "none",
-            }}
-            opacity={isGuide ? 0.85 : 1}
-          >
-            {content}
-          </text>
+          {vertical ? (
+            // 縦書き: 改行ごとに左へ新しい列。列原点は textLayout と共有し、
+            // 選択境界はその原点からの実測インク範囲で求める。
+            <>
+              {lines.map((col, i) => (
+                <text
+                  key={i}
+                  x={verticalColumnX(w, lh, i)}
+                  y={-h / 2}
+                  textAnchor="start"
+                  dominantBaseline="hanging"
+                  style={{
+                    writingMode: writingMode as React.CSSProperties["writingMode"],
+                    userSelect: "none",
+                  }}
+                  {...textProps}
+                >
+                  {col === "" ? " " : col}
+                </text>
+              ))}
+            </>
+          ) : (
+            <text
+              x={anchorX}
+              y={horizontalFirstBaselineY(lines.length, lh)}
+              textAnchor={textAnchor}
+              dominantBaseline="middle"
+              style={{
+                writingMode: writingMode as React.CSSProperties["writingMode"],
+                userSelect: "none",
+              }}
+              {...textProps}
+            >
+              {lines.map((line, i) => (
+                <tspan key={i} x={anchorX} dy={i === 0 ? 0 : lh}>
+                  {line === "" ? " " : line}
+                </tspan>
+              ))}
+            </text>
+          )}
         </g>
       );
       break;
