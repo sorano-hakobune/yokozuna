@@ -109,23 +109,34 @@ pnpm tauri build
 
 ```text
 src/
-├── types/               # Project / Layer / Keyframe / Symbol types
+├── App.tsx / main.tsx / router.tsx / routes/  # Entry + TanStack Router
+├── types/               # project.ts (Project / Layer / Keyframe / Symbol, etc.)
 ├── lib/
-│   ├── project/         # createEmptyProject, generateId, fileIo, etc.
-│   ├── easing.ts        # Easing functions
-│   ├── transformGeometry.ts
-│   └── ...
+│   ├── project/         # createEmptyProject, generateId, fileIo, persistence, etc.
+│   ├── animation/       # easing.ts, interpolate.ts, motionPath.ts, onionSkin.ts
+│   ├── draw/            # shapeFactory, pathBezier, fillRegion, erasePath, etc.
+│   ├── export/          # renderFrameCanvas, exportVideo, exportPngSequence, etc.
+│   ├── selection/       # selectionBounds, alignDistribute, groupTransform, etc.
+│   ├── stage/           # snap.ts, hitTest.ts
+│   ├── layers/          # layerGroups, layerFolders
+│   ├── filters/         # elementFilters, SvgFilterDefs
+│   └── color.ts / id.ts / file-utils.ts / systemFonts.ts / preview-* etc.
 ├── stores/
-│   └── projectStore.ts  # Zustand main store + selectors
+│   ├── projectStore.ts / projectSelectors.ts
+│   └── slices/          # element / layer / keyframe / asset / ui / history, etc.
 ├── components/
-│   ├── Editor/          # Main editor shell
-│   ├── Stage/           # Canvas, transform handles, drawing tools
+│   ├── Editor/          # Main editor shell + parts/
+│   ├── Stage/           # Stage.tsx, TransformControls, drawing tools + transformGeometry.ts
 │   ├── Timeline/        # Timeline UI
-│   ├── Inspector/       # Right dock (Color / Library / Properties)
-│   ├── MenuBar/
-│   ├── ToolsPanel/
-│   └── Playback/
-└── hooks/               # Playback sync, autosave, etc.
+│   ├── Inspector/       # Right dock (property editing) + parts/ hooks/
+│   ├── Panels/          # ColorPanel / LibraryPanel
+│   ├── MenuBar/         # Menus + menus/
+│   ├── ToolsPanel/      # ToolsPanel.tsx
+│   ├── Playback/        # PlaybackControls.tsx
+│   └── ui/              # Shared UI: Dialog / ContextMenu / ExportDialogs, etc.
+├── hooks/               # usePlayback, useAutosave, useAudioSync, etc.
+├── styles/ / styles.css # editor.css, etc.
+└── assets/              # favicon.svg, etc.
 ```
 
 ---
