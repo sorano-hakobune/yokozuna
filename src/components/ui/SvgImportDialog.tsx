@@ -11,20 +11,21 @@ export type SvgImportSettings = {
 type Props = {
   open: boolean;
   fileName: string;
+  defaultMode?: SvgImportMode;
   onClose: () => void;
   onImport: (settings: SvgImportSettings) => void | Promise<void>;
 };
 
-export function SvgImportDialog({ open, fileName, onClose, onImport }: Props) {
+export function SvgImportDialog({ open, fileName, defaultMode, onClose, onImport }: Props) {
   const [mode, setMode] = useState<SvgImportMode>("vector");
   const [scale, setScale] = useState(1);
 
   useEffect(() => {
     if (open) {
-      setMode("vector");
+      setMode(defaultMode ?? "vector");
       setScale(1);
     }
-  }, [open]);
+  }, [open, defaultMode]);
 
   return (
     <Dialog

@@ -203,6 +203,17 @@ export interface ShapeElement extends BaseElement {
   fillGradient?: GradientFill;
   stroke?: string;
   strokeWidth?: number;
+  /** SVG stroke presentation attributes (undefined = renderer default). */
+  strokeLinecap?: "butt" | "round" | "square";
+  strokeLinejoin?: "miter" | "round" | "bevel";
+  strokeMiterlimit?: number;
+  strokeDasharray?: number[];
+  strokeDashoffset?: number;
+  /**
+   * Clipping groups in shape-local coords (same frame as `points`).
+   * Entries intersect (nested SVG clip-paths); paths within one entry unite.
+   */
+  clip?: { paths: PathPoint[][] }[];
   width?: number;
   height?: number;
   radius?: number;

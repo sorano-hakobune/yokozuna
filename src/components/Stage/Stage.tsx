@@ -1784,7 +1784,7 @@ const StageInner: React.FC = () => {
             height={settings.height}
             fill="none"
             stroke="rgba(0,0,0,0.45)"
-            strokeWidth={1 / Math.max(canvasZoom, 0.0001)}
+            strokeWidth={1}
             vectorEffect="non-scaling-stroke"
             pointerEvents="none"
           />

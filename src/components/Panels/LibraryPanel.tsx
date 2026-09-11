@@ -12,13 +12,13 @@ import {
   pickFiles,
   readSvgText,
 } from "@/lib/project";
-import type { Asset, Project, Symbol, SymbolType } from "@/types/project";
+import type { Asset, Project, Symbol } from "@/types/project";
+import { SvgImportDialog, type SvgImportMode, type SvgImportSettings } from "@/components/ui/SvgImportDialog";
+import { SymbolDialog, type SymbolDialogSettings } from "@/components/ui/SymbolDialog";
 
 type LibraryFilter = "all" | "symbols" | "bitmaps" | "audio";
 type LibrarySort = "name" | "type" | "size";
 type LibraryView = "list" | "grid";
-/** SVG 取り込み方法 */
-type SvgImportMode = "bitmap" | "vector" | "both";
 
 function countSymbolUsage(project: Project, symbolId: string): number {
   let n = 0;
@@ -97,6 +97,15 @@ export function LibraryPanel() {
   const [isDragOver, setIsDragOver] = useState(false);
   /** Remember last SVG import choice for the session. */
   const [svgMode, setSvgMode] = useState<SvgImportMode>("both");
+  const [svgPending, setSvgPending] = useState<{
+    fileName: string;
+    resolve: (s: SvgImportSettings | null) => void;
+  } | null>(null);
+  const [symbolDialog, setSymbolDialog] = useState<{
+    mode: "create" | "convert";
+    defaultName: string;
+    resolve: (s: SymbolDialogSettings | null) => void;
+  } | null>(null);
 
   const q = query.trim().toLowerCase();
 
@@ -182,27 +191,32 @@ export function LibraryPanel() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [assets, filter, q, sort]);
 
-  const askSvgMode = (fileName: string): SvgImportMode | null => {
-    const choice = window.prompt(
-      `「${fileName}」の取り込み方法を選んでください:\n` +
-        `  1 = ビットマップ（画像として）\n` +
-        `  2 = パスに変換（編集可能な図形）\n` +
-        `  3 = 両方（ライブラリに画像 + パスを配置）\n` +
-        `キャンセルでスキップ`,
-      svgMode === "bitmap" ? "1" : svgMode === "vector" ? "2" : "3",
-    );
-    if (choice == null) return null;
-    const c = choice.trim();
-    if (c === "1" || c.toLowerCase() === "bitmap" || c === "ビットマップ") {
-      setSvgMode("bitmap");
-      return "bitmap";
-    }
-    if (c === "2" || c.toLowerCase() === "vector" || c === "パス") {
-      setSvgMode("vector");
-      return "vector";
-    }
-    setSvgMode("both");
-    return "both";
+  const askSvgMode = (fileName: string): Promise<SvgImportSettings | null> =>
+    new Promise<SvgImportSettings | null>((resolve) => {
+      setSvgPending({ fileName, resolve });
+    });
+
+  const resolveSvgPending = (settings: SvgImportSettings | null) => {
+    const pending = svgPending;
+    setSvgPending(null);
+    if (!pending) return;
+    if (settings) setSvgMode(settings.mode);
+    pending.resolve(settings);
+  };
+
+  const askSymbolSettings = (
+    mode: "create" | "convert",
+    defaultName: string,
+  ): Promise<SymbolDialogSettings | null> =>
+    new Promise<SymbolDialogSettings | null>((resolve) => {
+      setSymbolDialog({ mode, defaultName, resolve });
+    });
+
+  const resolveSymbolDialog = (settings: SymbolDialogSettings | null) => {
+    const dlg = symbolDialog;
+    setSymbolDialog(null);
+    if (!dlg) return;
+    dlg.resolve(settings);
   };
 
   const placeShapesFromSvgText = async (
@@ -245,8 +259,8 @@ export function LibraryPanel() {
     for (const file of list) {
       try {
         if (isSvgFile(file)) {
-          const mode =
-            options?.forceSvgMode ?? askSvgMode(file.name) ?? null;
+          const mode: SvgImportMode | null =
+            options?.forceSvgMode ?? (await askSvgMode(file.name))?.mode ?? null;
           if (mode == null) continue;
 
           if (mode === "bitmap" || mode === "both") {
@@ -437,24 +451,20 @@ export function LibraryPanel() {
   };
 
   const handleNewSymbol = () => {
-    const name = window.prompt("シンボル名", `Symbol ${symbols.length + 1}`);
-    if (!name) return;
-    const typeInput = window.prompt(
-      "種類: graphic または movieClip",
-      "graphic",
-    );
-    const type: SymbolType =
-      typeInput === "movieClip" ? "movieClip" : "graphic";
+    const defaultName = `Symbol ${symbols.length + 1}`;
     const layerId = selectedLayerId;
     const frame = currentFrame;
     const cx = settings.width / 2;
     const cy = settings.height / 2;
-    queueMicrotask(() => {
-      const id = createSymbol(name, type);
-      if (layerId) {
-        addInstanceElement(layerId, frame, id, cx, cy);
-      }
-      setActiveId(id);
+    void askSymbolSettings("create", defaultName).then((cfg) => {
+      if (!cfg) return;
+      queueMicrotask(() => {
+        const id = createSymbol(cfg.name, cfg.symbolType);
+        if (layerId) {
+          addInstanceElement(layerId, frame, id, cx, cy);
+        }
+        setActiveId(id);
+      });
     });
   };
 
@@ -463,17 +473,13 @@ export function LibraryPanel() {
       window.alert("ステージ上のオブジェクトを選択してください。");
       return;
     }
-    const name = window.prompt("シンボル名", `Symbol ${symbols.length + 1}`);
-    if (!name) return;
-    const typeInput = window.prompt(
-      "種類: graphic または movieClip",
-      "graphic",
-    );
-    const type: SymbolType =
-      typeInput === "movieClip" ? "movieClip" : "graphic";
-    queueMicrotask(() => {
-      const id = convertSelectionToSymbol(name, type);
-      if (id) setActiveId(id);
+    const defaultName = `Symbol ${symbols.length + 1}`;
+    void askSymbolSettings("convert", defaultName).then((cfg) => {
+      if (!cfg) return;
+      queueMicrotask(() => {
+        const id = convertSelectionToSymbol(cfg.name, cfg.symbolType);
+        if (id) setActiveId(id);
+      });
     });
   };
 
@@ -912,6 +918,20 @@ export function LibraryPanel() {
           </>
         )}
       </div>
+      <SvgImportDialog
+        open={svgPending != null}
+        fileName={svgPending?.fileName ?? ""}
+        defaultMode={svgMode}
+        onClose={() => resolveSvgPending(null)}
+        onImport={(s) => resolveSvgPending(s)}
+      />
+      <SymbolDialog
+        open={symbolDialog != null}
+        mode={symbolDialog?.mode ?? "create"}
+        defaultName={symbolDialog?.defaultName ?? "Symbol 1"}
+        onClose={() => resolveSymbolDialog(null)}
+        onConfirm={(s) => resolveSymbolDialog(s)}
+      />
     </section>
   );
 }

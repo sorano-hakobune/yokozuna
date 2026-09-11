@@ -13,8 +13,11 @@ const SEL_OUTER = "#ffffff";
 /** Axis-aligned group selection box (multi-select). */
 export function SelectionOverlay({ bounds, zoom, count }: Props) {
   const invZoom = 1 / Math.max(0.15, zoom);
-  const strokeW = 1.5 * invZoom;
-  const outerW = 3 * invZoom;
+  // Stroke widths stay in screen px via vector-effect (no /zoom:
+  // double compensation thinned them on zoom-in). Geometry offsets
+  // (pad) and text (no vector-effect) keep single user-unit scaling.
+  const strokeW = 1.5;
+  const outerW = 3;
   const pad = 2 * invZoom;
 
   return (
@@ -37,7 +40,7 @@ export function SelectionOverlay({ bounds, zoom, count }: Props) {
         fill="none"
         stroke={SEL_STROKE}
         strokeWidth={strokeW}
-        strokeDasharray={`${5 * invZoom} ${3 * invZoom}`}
+        strokeDasharray="5 3"
         vectorEffect="non-scaling-stroke"
       />
       {count > 1 && (
@@ -66,8 +69,7 @@ type MarqueeProps = {
   zoom: number;
 };
 
-export function MarqueeRect({ x0, y0, x1, y1, zoom }: MarqueeProps) {
-  const invZoom = 1 / Math.max(0.15, zoom);
+export function MarqueeRect({ x0, y0, x1, y1 }: MarqueeProps) {
   const minX = Math.min(x0, x1);
   const minY = Math.min(y0, y1);
   const w = Math.abs(x1 - x0);
@@ -81,8 +83,8 @@ export function MarqueeRect({ x0, y0, x1, y1, zoom }: MarqueeProps) {
       height={h}
       fill="rgba(224, 90, 60, 0.12)"
       stroke="#e05a3c"
-      strokeWidth={1 * invZoom}
-      strokeDasharray={`${4 * invZoom} ${3 * invZoom}`}
+      strokeWidth={1}
+      strokeDasharray="4 3"
       vectorEffect="non-scaling-stroke"
       pointerEvents="none"
     />

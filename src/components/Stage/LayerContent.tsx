@@ -86,14 +86,40 @@ const VectorShape: React.FC<{
     : isOverlay
       ? 1
       : (shape.strokeWidth ?? 1);
+  // Imported SVG stroke presentation (undefined = leave renderer default).
+  const strokeLinecap = isMask || isGuide || isOverlay ? undefined : shape.strokeLinecap;
+  const strokeLinejoin = isMask || isGuide || isOverlay ? undefined : shape.strokeLinejoin;
+  const strokeMiterlimit = isMask || isGuide || isOverlay ? undefined : shape.strokeMiterlimit;
+  const strokeDashoffset = isMask || isGuide || isOverlay ? undefined : shape.strokeDashoffset;
+  const dasharray =
+    isGuide || isOverlay
+      ? "4 3"
+      : shape.strokeDasharray?.length
+        ? shape.strokeDasharray.join(" ")
+        : undefined;
+
+  // Clipped shapes render inside a transformed wrapper so the clipPath
+  // (userSpaceOnUse, local coords) shares the shape's user space.
+  const clipGroups = !isMask && !isGuide && !isOverlay ? (shape.clip ?? []) : [];
+  const clipped = clipGroups.length > 0;
+  // Artwork (normal/mask/guide) strokes scale together with geometry
+  // (zoom and object transforms). Only the authoring overlay keeps
+  // screen-constant strokes via vector-effect.
+  const keepConstantStroke = isOverlay;
 
   const common = {
     fill,
     stroke,
     strokeWidth,
-    strokeDasharray: isGuide ? "4 3" : undefined,
-    vectorEffect: "non-scaling-stroke" as const,
-    transform: elementTransform(shape),
+    strokeLinecap,
+    strokeLinejoin,
+    strokeMiterlimit,
+    strokeDasharray: dasharray,
+    strokeDashoffset,
+    vectorEffect: keepConstantStroke
+      ? ("non-scaling-stroke" as const)
+      : undefined,
+    transform: clipped ? undefined : elementTransform(shape),
   };
 
   let body: React.ReactNode = null;
@@ -155,7 +181,7 @@ const VectorShape: React.FC<{
         opacity: isGuide ? 0.85 : 1,
       };
       body = (
-        <g transform={elementTransform(shape)}>
+        <g transform={clipped ? undefined : elementTransform(shape)}>
           <rect
             x={-w / 2}
             y={-h / 2}
@@ -232,13 +258,58 @@ const VectorShape: React.FC<{
       body = null;
   }
 
+  const content =
+    clipped && body ? (
+      <g transform={elementTransform(shape)}>
+        {clipGroups.map((group, gi) => {
+          const id = `clip-${shape.id}-${gi}`;
+          return (
+            <clipPath key={id} id={id} clipPathUnits="userSpaceOnUse">
+              <path d={clipPathsToD(group.paths)} />
+            </clipPath>
+          );
+        })}
+        {wrapWithClipGroups(body, shape.id, clipGroups.length)}
+      </g>
+    ) : (
+      body
+    );
+
   return (
     <>
       {gradientId ? <ShapeGradientDefs shape={shape} /> : null}
-      {body}
+      {content}
     </>
   );
 };
+
+/** Local-coord clip polygons → SVG path data (straight segments). */
+function clipPathsToD(paths: { x: number; y: number }[][]): string {
+  return paths
+    .filter((p) => p.length >= 3)
+    .map(
+      (p) =>
+        `M${p.map((pt) => `${pt.x} ${pt.y}`).join("L")}Z`,
+    )
+    .join("");
+}
+
+/** Nest one <g clip-path> per clip group (groups intersect). */
+function wrapWithClipGroups(
+  content: React.ReactNode,
+  shapeId: string,
+  count: number,
+): React.ReactNode {
+  let nested = content;
+  for (let gi = count - 1; gi >= 0; gi--) {
+    nested = (
+      <g key={gi} clipPath={`url(#clip-${shapeId}-${gi})`}>
+        {nested}
+      </g>
+    );
+  }
+  return nested;
+}
 
 function renderElement(
   element: Element,

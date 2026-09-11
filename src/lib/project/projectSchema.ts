@@ -64,6 +64,14 @@ const elementSchema = transformSchema
       .optional(),
     stroke: z.string().optional(),
     strokeWidth: z.number().optional(),
+    strokeLinecap: z.enum(["butt", "round", "square"]).optional(),
+    strokeLinejoin: z.enum(["miter", "round", "bevel"]).optional(),
+    strokeMiterlimit: z.number().optional(),
+    strokeDasharray: z.array(z.number()).optional(),
+    strokeDashoffset: z.number().optional(),
+    clip: z
+      .array(z.object({ paths: z.array(z.array(pathPointSchema)) }))
+      .optional(),
     width: z.number().optional(),
     height: z.number().optional(),
     radius: z.number().optional(),

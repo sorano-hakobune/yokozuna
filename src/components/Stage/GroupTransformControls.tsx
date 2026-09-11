@@ -24,8 +24,10 @@ export function GroupTransformControls({
 }: Props) {
   const invZoom = 1 / Math.max(0.15, zoom);
   const hs = HANDLE_SIZE * invZoom;
-  const strokeW = 1.5 * invZoom;
-  const outerW = 3 * invZoom;
+  // Screen-constant strokes via vector-effect (no /zoom compensation).
+  // Geometry (hs/pad/positions) and text (no vector-effect) unchanged.
+  const strokeW = 1.5;
+  const outerW = 3;
   const pad = 2 * invZoom;
 
   const x = bounds.minX - pad;
@@ -72,7 +74,7 @@ export function GroupTransformControls({
         fill="none"
         stroke={SEL_STROKE}
         strokeWidth={strokeW}
-        strokeDasharray={`${5 * invZoom} ${3 * invZoom}`}
+        strokeDasharray="5 3"
         vectorEffect="non-scaling-stroke"
       />
       <line

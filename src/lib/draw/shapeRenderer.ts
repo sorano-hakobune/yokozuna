@@ -27,6 +27,28 @@ export function drawShape(
     ctx.strokeStyle = shape.stroke;
     ctx.lineWidth = shape.strokeWidth ?? 1;
   }
+  // Imported SVG stroke presentation (set only when defined: existing
+  // content keeps each renderer's current defaults).
+  if (shape.strokeLinecap) ctx.lineCap = shape.strokeLinecap;
+  if (shape.strokeLinejoin) ctx.lineJoin = shape.strokeLinejoin;
+  if (shape.strokeMiterlimit != null) ctx.miterLimit = shape.strokeMiterlimit;
+  if (shape.strokeDasharray) ctx.setLineDash(shape.strokeDasharray);
+  if (shape.strokeDashoffset != null) ctx.lineDashOffset = shape.strokeDashoffset;
+  // Imported SVG clip-paths (local coords, current transform applies).
+  if (shape.clip?.length) {
+    for (const group of shape.clip) {
+      const clipPath = new Path2D();
+      for (const poly of group.paths) {
+        if (poly.length < 3) continue;
+        clipPath.moveTo(poly[0]!.x, poly[0]!.y);
+        for (let i = 1; i < poly.length; i++) {
+          clipPath.lineTo(poly[i]!.x, poly[i]!.y);
+        }
+        clipPath.closePath();
+      }
+      ctx.clip(clipPath);
+    }
+  }
 
   switch (shape.shapeType) {
     case "rectangle":

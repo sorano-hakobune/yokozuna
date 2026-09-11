@@ -37,8 +37,9 @@ export function TransformControls({
 
   const invZoom = 1 / Math.max(0.15, zoom);
   const hs = HANDLE_SIZE * invZoom;
-  const strokeW = 1.5 * invZoom;
-  const outerW = 3 * invZoom;
+  // Screen-constant strokes via vector-effect (no /zoom compensation).
+  const strokeW = 1.5;
+  const outerW = 3;
 
   const boxCorners: { x: number; y: number }[] = [
     localToWorld({ x: bounds.cx - bounds.halfW, y: bounds.cy - bounds.halfH }, t),
@@ -139,7 +140,7 @@ export function TransformControls({
           x2={t.x + hs * 0.85}
           y2={t.y}
           stroke={SEL_STROKE}
-          strokeWidth={strokeW * 0.9}
+          strokeWidth={1.35}
           vectorEffect="non-scaling-stroke"
         />
         <line
@@ -148,7 +149,7 @@ export function TransformControls({
           x2={t.x}
           y2={t.y + hs * 0.85}
           stroke={SEL_STROKE}
-          strokeWidth={strokeW * 0.9}
+          strokeWidth={1.35}
           vectorEffect="non-scaling-stroke"
         />
       </g>

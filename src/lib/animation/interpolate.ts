@@ -459,6 +459,12 @@ function interpolateMotion(
         a.strokeWidth != null && b.strokeWidth != null
           ? lerp(a.strokeWidth, b.strokeWidth, t)
           : a.strokeWidth,
+      strokeLinecap: a.strokeLinecap ?? b.strokeLinecap,
+      strokeLinejoin: a.strokeLinejoin ?? b.strokeLinejoin,
+      strokeMiterlimit: a.strokeMiterlimit ?? b.strokeMiterlimit,
+      strokeDasharray: a.strokeDasharray ?? b.strokeDasharray,
+      strokeDashoffset: a.strokeDashoffset ?? b.strokeDashoffset,
+      clip: a.clip ?? b.clip,
       width:
         a.width != null && b.width != null
           ? lerp(a.width, b.width, t)
@@ -565,6 +571,12 @@ function interpolateShape(a: Element, b: Element, t: number): Element {
     fillGradient: lerpGradient(a.fillGradient, b.fillGradient, t, (c0, c1, tt = t) => lerpColor(c0, c1, tt)),
     stroke: lerpColor(a.stroke, b.stroke, t) ?? a.stroke ?? b.stroke,
     strokeWidth,
+    strokeLinecap: a.strokeLinecap ?? b.strokeLinecap,
+    strokeLinejoin: a.strokeLinejoin ?? b.strokeLinejoin,
+    strokeMiterlimit: a.strokeMiterlimit ?? b.strokeMiterlimit,
+    strokeDasharray: a.strokeDasharray ?? b.strokeDasharray,
+    strokeDashoffset: a.strokeDashoffset ?? b.strokeDashoffset,
+    clip: a.clip ?? b.clip,
     points: morphed,
     closePath: closed,
     fillRule: a.fillRule ?? b.fillRule,

@@ -25,7 +25,8 @@ export function MotionPathOverlay({
   onMoveHandle,
 }: Props) {
   const inv = 1 / Math.max(0.15, zoom);
-  const strokeW = 1.5 * inv;
+  // Screen-constant strokes via vector-effect (no /zoom compensation).
+  const strokeW = 1.5;
   const samples = sampleMotionPathPoints(path, 56);
   const pts = path.points;
 
@@ -37,7 +38,7 @@ export function MotionPathOverlay({
           fill="none"
           stroke="#e05a3c"
           strokeWidth={strokeW}
-          strokeDasharray={`${6 * inv} ${4 * inv}`}
+          strokeDasharray="6 4"
           opacity={0.9}
           vectorEffect="non-scaling-stroke"
         />

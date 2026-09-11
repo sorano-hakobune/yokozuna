@@ -27,7 +27,8 @@ export function PathVertexControls({
   const r = 4.5 * invZoom;
   const midR = 3.2 * invZoom;
   const handleR = 3.6 * invZoom;
-  const strokeW = 1.35 * invZoom;
+  // Screen-constant strokes via vector-effect (no /zoom compensation).
+  const strokeW = 1.35;
   const verts = pathVerticesWorld(shape);
   const mids = pathEdgeMidpointsWorld(shape);
   const tf = elementWorldTransform(shape);
@@ -83,7 +84,7 @@ export function PathVertexControls({
             points={curvePreview.join(" ")}
             fill="none"
             stroke="#ffffff"
-            strokeWidth={strokeW * 2}
+            strokeWidth={strokeW * 2 /* 2.7 screen px via vector-effect */}
             strokeOpacity={0.5}
             vectorEffect="non-scaling-stroke"
           />
@@ -106,7 +107,7 @@ export function PathVertexControls({
           fill="#0b0f12"
           stroke="#ffffff"
           strokeWidth={strokeW}
-          strokeDasharray={`${2 * invZoom} ${2 * invZoom}`}
+          strokeDasharray="2 2"
           vectorEffect="non-scaling-stroke"
           opacity={0.9}
         />

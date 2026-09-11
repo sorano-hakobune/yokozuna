@@ -80,6 +80,21 @@ function drawShape(ctx: CanvasRenderingContext2D, shape: ShapeElement) {
     shape.stroke && shape.stroke !== "none" ? shape.stroke : undefined;
   const strokeWidth = shape.strokeWidth ?? 1;
 
+  if (shape.clip?.length) {
+    for (const group of shape.clip) {
+      const clipPath = new Path2D();
+      for (const poly of group.paths) {
+        if (poly.length < 3) continue;
+        clipPath.moveTo(poly[0]!.x, poly[0]!.y);
+        for (let i = 1; i < poly.length; i++) {
+          clipPath.lineTo(poly[i]!.x, poly[i]!.y);
+        }
+        clipPath.closePath();
+      }
+      ctx.clip(clipPath);
+    }
+  }
+
   const paint = () => {
     if (canFill) {
       if (fill) ctx.fillStyle = fill;
@@ -88,8 +103,11 @@ function drawShape(ctx: CanvasRenderingContext2D, shape: ShapeElement) {
     if (stroke) {
       ctx.strokeStyle = stroke;
       ctx.lineWidth = strokeWidth;
-      ctx.lineJoin = "round";
-      ctx.lineCap = "round";
+      ctx.lineJoin = shape.strokeLinejoin ?? "round";
+      ctx.lineCap = shape.strokeLinecap ?? "round";
+      if (shape.strokeMiterlimit != null) ctx.miterLimit = shape.strokeMiterlimit;
+      if (shape.strokeDasharray) ctx.setLineDash(shape.strokeDasharray);
+      if (shape.strokeDashoffset != null) ctx.lineDashOffset = shape.strokeDashoffset;
       ctx.stroke();
     }
   };

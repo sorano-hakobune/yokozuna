@@ -20,7 +20,10 @@ export function StageGrid({
   zoom,
 }: GridProps) {
   if (!visible || gridSize <= 0) return null;
-  const stroke = 1 / Math.max(zoom, 0.0001);
+  // Constant screen width via vector-effect (no manual 1/zoom: that would
+  // double-compensate and thin the grid on zoom-in).
+  void zoom;
+  const stroke = 1;
   const majorEvery = 5;
   const lines: ReactNode[] = [];
   let i = 0;
@@ -87,7 +90,10 @@ export function StageGuides({
   onPointerDownGuide,
 }: GuidesProps) {
   if (!visible || !guides.length) return null;
-  const stroke = 1.25 / Math.max(zoom, 0.0001);
+  // Visible line: constant screen width via vector-effect (no 1/zoom).
+  // `hit` stays zoom-compensated: it has no vector-effect, so a single
+  // user-unit compensation is correct for a constant hit area.
+  const stroke = 1.25;
   const hit = 8 / Math.max(zoom, 0.0001);
   return (
     <g className="stage-guides">
@@ -114,7 +120,7 @@ export function StageGuides({
                 y2={height + 40}
                 stroke={color}
                 strokeWidth={stroke}
-                strokeDasharray={`${4 / zoom} ${3 / zoom}`}
+                strokeDasharray="4 3"
                 vectorEffect="non-scaling-stroke"
                 pointerEvents="none"
               />
@@ -140,7 +146,7 @@ export function StageGuides({
               y2={g.position}
               stroke={color}
               strokeWidth={stroke}
-              strokeDasharray={`${4 / zoom} ${3 / zoom}`}
+              strokeDasharray="4 3"
               vectorEffect="non-scaling-stroke"
               pointerEvents="none"
             />
