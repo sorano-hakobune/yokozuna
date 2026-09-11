@@ -1,0 +1,100 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - "app-v*"
+
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build (${{ matrix.name }})
+
+    strategy:
+      fail-fast: false
+
+      matrix:
+        include:
+          # Windows x64
+          - name: Windows x64
+            os: windows-latest
+            args: ""
+
+          # macOS Intel
+          - name: macOS Intel
+            os: macos-latest
+            args: "--target x86_64-apple-darwin"
+
+          # macOS Apple Silicon
+          - name: macOS Apple Silicon
+            os: macos-latest
+            args: "--target aarch64-apple-darwin"
+
+          # Linux x64
+          - name: Linux x64
+            os: ubuntu-22.04
+            args: ""
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            build-essential \
+            curl \
+            wget \
+            file \
+            libxdo-dev \
+            libssl-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "./src-tauri -> target"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Tauri application
+        uses: tauri-apps/tauri-action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: "yokozuna ${{ github.ref_name }}"
+          releaseBody: |
+            ## yokozuna ${{ github.ref_name }}
+
+            This release was automatically built by GitHub Actions.
+
+            ### Supported platforms
+
+            - Windows x64
+            - macOS Intel
+            - macOS Apple Silicon
+            - Linux x64
+          releaseDraft: false
+          prerelease: false
+          args: ${{ matrix.args }}

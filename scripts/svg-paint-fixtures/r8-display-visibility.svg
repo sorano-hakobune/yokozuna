@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200">
+  <g display="none">
+    <path d="M0 0 H10 V10 H10 Z" fill="#ff0000"/>
+  </g>
+  <path d="M20 0 H30 V10 H20 Z" fill="#00ff00" visibility="hidden"/>
+  <g visibility="hidden">
+    <path d="M40 0 H50 V10 H40 Z" fill="#0000ff" visibility="visible"/>
+  </g>
+  <path d="M60 0 H70 V10 H60 Z" fill="#ffff00"/>
+</svg>
