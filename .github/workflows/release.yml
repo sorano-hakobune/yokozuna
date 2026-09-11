@@ -95,6 +95,6 @@ jobs:
             - macOS Intel
             - macOS Apple Silicon
             - Linux x64
-          releaseDraft: false
+          releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}

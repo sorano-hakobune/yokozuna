@@ -12,15 +12,24 @@
   "app": {
     "windows": [
       {
+        "label": "main",
         "title": "yokozuna",
-        "width": 800,
-        "height": 600,
-        "maximized": true
+        "width": 1280,
+        "height": 800,
+        "minWidth": 800,
+        "minHeight": 600,
+        "resizable": true,
+        "maximized": true,
+        "fullscreen": false,
+        "center": true,
+        "visible": true,
+        "decorations": true
       }
     ],
     "security": {
-      "csp": null
-    }
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: asset: http://asset.localhost; media-src 'self' blob: data:; font-src 'self' data:; connect-src 'self' ipc: http://ipc.localhost"
+    },
+    "withGlobalTauri": false
   },
   "bundle": {
     "active": true,
@@ -32,9 +41,52 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
+    "category": "Graphics",
+    "shortDescription": "Flash風タイムラインアニメーションエディタ",
+    "longDescription": "軽量でクロスプラットフォームなタイムラインアニメーションエディタ。Adobe Animate / Flash 風の操作感を目指しています。",
+    "copyright": "Copyright © 2026 Hakobune Sorano",
+    "license": "MIT",
     "windows": {
       "wix": {
         "language": "ja-JP"
+      },
+      "nsis": {
+        "languages": ["Japanese", "English"],
+        "displayLanguageSelector": true,
+        "installMode": "currentUser"
+      },
+      "webviewInstallMode": {
+        "type": "downloadBootstrapper",
+        "silent": true
+      }
+    },
+    "macOS": {
+      "minimumSystemVersion": "10.15",
+      "hardenedRuntime": true,
+      "dmg": {
+        "appPosition": {
+          "x": 180,
+          "y": 170
+        },
+        "applicationFolderPosition": {
+          "x": 480,
+          "y": 170
+        },
+        "windowSize": {
+          "width": 660,
+          "height": 400
+        }
+      }
+    },
+    "linux": {
+      "deb": {
+        "depends": []
+      },
+      "appimage": {
+        "bundleMediaFramework": false
+      },
+      "rpm": {
+        "release": "1"
       }
     }
   }
