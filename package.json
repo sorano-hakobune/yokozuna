@@ -8,8 +8,8 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "tauri": "tauri",
-    "version:sync": "node scripts/sync-version.js",
-    "version:bump": "npm version patch --no-git-tag-version && npm run version:sync"
+    "sync-version": "node scripts/sync-version.js",
+    "version": "npm run sync-version && git add src-tauri/Cargo.toml src-tauri/tauri.conf.json"
   },
   "dependencies": {
     "@tanstack/react-router": "^1.170.32",
