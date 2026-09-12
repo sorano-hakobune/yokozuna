@@ -64,6 +64,7 @@ jobs:
         with:
           tagName: v${{ steps.version.outputs.version }} # tauri.conf.json の version を使用
           releaseName: "yokozuna v${{ steps.version.outputs.version }}"
+          # この本文は自動生成ノートの「先頭」に付与されます
           releaseBody: |
             ## yokozuna v${{ steps.version.outputs.version }}
 
@@ -75,4 +76,6 @@ jobs:
             - **Linux**: `.deb` または `.AppImage`
           releaseDraft: true
           prerelease: false
+          # GitHub の Release Notes API で PR / commit からノートを自動生成
+          generateReleaseNotes: true
           args: ${{ matrix.args }}

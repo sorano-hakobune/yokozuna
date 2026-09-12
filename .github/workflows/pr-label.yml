@@ -1,0 +1,44 @@
+# PR タイトル（Conventional Commits）から自動でラベルを付ける
+# 例: "feat: 新機能" → feature, "fix!: 破壊的修正" → fix + breaking
+
+name: PR Title Labeler
+
+on:
+  pull_request_target:
+    types: [opened, edited, reopened, synchronize]
+
+# フォークからの PR でもラベルを付けられるように pull_request_target を使用
+# （信頼できないコードは checkout しない）
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  label:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Label PR from conventional commit title
+        uses: bcoe/conventional-release-labels@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          # Conventional Commit の type → 付けるラベル
+          # 前回の .github/release.yml の categories と揃えています
+          type_labels: |
+            {
+              "feat": "feature",
+              "fix": "fix",
+              "docs": "documentation",
+              "style": "ui",
+              "refactor": "refactor",
+              "perf": "performance",
+              "test": "test",
+              "build": "build",
+              "ci": "ci",
+              "chore": "chore",
+              "revert": "revert"
+            }
+          # リリースノートに載せたくない type（chore など）
+          ignored_types: '["chore"]'
+          # 上記 ignored_types のときに付けるラベル
+          ignore_label: "ignore-for-release"

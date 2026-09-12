@@ -1,0 +1,54 @@
+# .github/release.yml
+# GitHub の自動生成リリースノートのカテゴリ分け設定
+# PR に付いているラベルでセクションを振り分けます
+
+changelog:
+  exclude:
+    labels:
+      - ignore-for-release
+      - skip-changelog
+    authors:
+      - dependabot
+      - dependabot[bot]
+  categories:
+    - title: 💥 Breaking Changes
+      labels:
+        - breaking
+        - breaking-change
+        - Semver-Major
+    - title: ✨ New Feature
+      labels:
+        - feature
+        - enhancement
+        - Semver-Minor
+    - title: 🐛 Bug Fixes
+      labels:
+        - bug
+        - fix
+        - bugfix
+    - title: 🎨 UI / UX
+      labels:
+        - ui
+        - ux
+    - title: ⚡ Performance
+      labels:
+        - performance
+        - perf
+    - title: 📝 Documentation
+      labels:
+        - documentation
+        - docs
+    - title: 🔧 Maintenance / Internal Changes
+      labels:
+        - chore
+        - maintenance
+        - refactor
+        - ci
+        - build
+    - title: 📦 Dependencies
+      labels:
+        - dependencies
+        - deps
+    - title: Other Changes
+      labels:
+        - "*"
