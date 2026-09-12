@@ -1,14 +1,14 @@
 {
   "name": "yokozuna",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.1.0-beta.1",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
     "tauri": "tauri",
-    "sync-version": "node scripts/sync-version.js",
+    "sync-version": "node scripts/sync-version.cjs",
     "version": "npm run sync-version && git add src-tauri/Cargo.toml src-tauri/tauri.conf.json"
   },
   "dependencies": {

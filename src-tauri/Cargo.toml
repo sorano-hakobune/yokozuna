@@ -1,6 +1,6 @@
 [package]
 name = "yokozuna"
-version = "0.1.0"
+version = "0.1.0-beta.1"
 description = "Timeline-based 2D animation creation tool"
 authors = ["Hakobune Sorano"]
 edition = "2021"
