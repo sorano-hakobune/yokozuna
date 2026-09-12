@@ -33,7 +33,7 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": ["nsis", "dmg", "app", "deb", "appimage"],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -47,14 +47,8 @@
     "copyright": "Copyright © 2026 Hakobune Sorano",
     "license": "MIT",
     "windows": {
-      "wix": {
-        "language": "ja-JP"
-      },
       "nsis": {
-        "languages": [
-          "Japanese",
-          "English"
-        ],
+        "languages": ["Japanese", "English"],
         "displayLanguageSelector": true,
         "installMode": "currentUser"
       },
